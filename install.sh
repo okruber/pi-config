@@ -31,6 +31,7 @@ link settings.json
 link models.json
 link themes
 link extensions
+link AGENTS.md
 
 echo "==> Done. Restart pi to pick up theme/extension changes."
 echo "    Reminder: packages (superpowers, pi-subagents, pi-telegram) reinstall"
