@@ -1,0 +1,17 @@
+{
+  "lastChangelogVersion": "0.80.3",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-4-8",
+  "defaultThinkingLevel": "high",
+  "packages": [
+    "npm:@llblab/pi-telegram",
+    "git:github.com/obra/superpowers",
+    "npm:pi-subagents"
+  ],
+  "enabledModels": [
+    "openai-codex/gpt-5.5",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-opus-4-8"
+  ],
+  "theme": "catppuccin-frappe"
+}
