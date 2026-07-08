@@ -1,12 +1,13 @@
 {
   "lastChangelogVersion": "0.80.3",
-  "defaultProvider": "anthropic",
+  "defaultProvider": "claude-arrive",
   "defaultModel": "claude-opus-4-8",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
     "git:github.com/obra/superpowers",
-    "npm:pi-subagents"
+    "npm:pi-subagents",
+    "npm:pi-mcp-adapter"
   ],
   "enabledModels": [
     "anthropic/claude-opus-4-8",
