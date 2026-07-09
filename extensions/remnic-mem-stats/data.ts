@@ -167,7 +167,57 @@ export function readMemoryBody(absPath: string): string {
 export function dirSizeBytes(memoryDir: string): number {
   let total = 0;
   for (const file of walk(memoryDir)) {
+    const rel = file.startsWith(memoryDir) ? file.slice(memoryDir.length).replace(/^[/\\]+/, "") : file;
+    if (!classifyPath(rel)) continue;
     try { total += statSync(file).size; } catch { /* skip */ }
   }
   return total;
+}
+
+export interface Stats {
+  total: number;
+  byCategory: Record<string, number>;
+  byNamespace: Record<string, number>;
+  byDay: { day: string; count: number }[];
+  last24h: number;
+  lastCaptureAt: string | null;
+  categories: number;
+  namespaces: number;
+  sizeBytes: number;
+}
+
+export function aggregateStats(records: MemoryRecord[], now: number = Date.now()): Stats {
+  const byCategory: Record<string, number> = {};
+  const byNamespace: Record<string, number> = {};
+  const dayMap = new Map<string, number>();
+  let last24h = 0;
+  let lastCaptureAt: string | null = null;
+  let lastMs = -Infinity;
+  let sizeBytes = 0;
+  const cutoff = now - 24 * 60 * 60 * 1000;
+
+  for (const r of records) {
+    byCategory[r.category] = (byCategory[r.category] || 0) + 1;
+    byNamespace[r.namespace] = (byNamespace[r.namespace] || 0) + 1;
+    sizeBytes += r.size;
+    const ms = Date.parse(r.created);
+    if (Number.isFinite(ms)) {
+      const day = r.created.slice(0, 10);
+      dayMap.set(day, (dayMap.get(day) || 0) + 1);
+      if (ms >= cutoff && ms <= now) last24h++;
+      if (ms > lastMs) { lastMs = ms; lastCaptureAt = r.created; }
+    }
+  }
+  const byDay = [...dayMap.entries()].map(([day, count]) => ({ day, count })).sort((a, b) => a.day.localeCompare(b.day));
+  return {
+    total: records.length,
+    byCategory,
+    byNamespace,
+    byDay,
+    last24h,
+    lastCaptureAt,
+    categories: Object.keys(byCategory).length,
+    namespaces: Object.keys(byNamespace).length,
+    sizeBytes,
+  };
 }

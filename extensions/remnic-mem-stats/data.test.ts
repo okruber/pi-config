@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseFrontmatter, classifyPath, parseMemoryFile, scanMemories } from "./data.ts";
+import { parseFrontmatter, classifyPath, parseMemoryFile, scanMemories, dirSizeBytes } from "./data.ts";
+import { statSync } from "node:fs";
 
 function fixtureDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "mem-"));
@@ -59,5 +60,14 @@ test("scanMemories finds memories across namespaces, skips state/profile", () =>
   const f1 = recs.find((r) => r.id === "f1")!;
   assert.equal(f1.namespace, "proj");
   assert.equal(f1.category, "fact");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("dirSizeBytes counts only real memory files, excludes profile.md and state/*", () => {
+  const dir = fixtureDir();
+  const d1Size = statSync(join(dir, "decisions", "2026-07-08", "d1.md")).size;
+  const f1Size = statSync(join(dir, "namespaces", "proj", "facts", "2026-07-09", "f1.md")).size;
+  const total = dirSizeBytes(dir);
+  assert.equal(total, d1Size + f1Size);
   rmSync(dir, { recursive: true, force: true });
 });
