@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, sep } from "node:path";
+import { readFileSync, readdirSync, statSync, appendFileSync, mkdirSync } from "node:fs";
+import { join, sep, dirname } from "node:path";
 
 export type Verdict = "good" | "junk" | "miscategorized";
 
@@ -220,4 +220,68 @@ export function aggregateStats(records: MemoryRecord[], now: number = Date.now()
     namespaces: Object.keys(byNamespace).length,
     sizeBytes,
   };
+}
+
+export interface RatingRecord {
+  memoryId: string;
+  verdict: Verdict;
+  note: string;
+  ts: string;
+  category: string;
+  namespace: string;
+}
+
+export function readRatings(ratingsPath: string): Map<string, RatingRecord> {
+  const map = new Map<string, RatingRecord>();
+  let text: string;
+  try {
+    text = readFileSync(ratingsPath, "utf8");
+  } catch {
+    return map;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    try {
+      const rec = JSON.parse(t) as RatingRecord;
+      if (rec && rec.memoryId) map.set(rec.memoryId, rec); // later lines overwrite → latest-wins
+    } catch {
+      // skip malformed line
+    }
+  }
+  return map;
+}
+
+export function appendRating(ratingsPath: string, rec: RatingRecord): void {
+  mkdirSync(dirname(ratingsPath), { recursive: true });
+  appendFileSync(ratingsPath, JSON.stringify(rec) + "\n", "utf8");
+}
+
+export function accuracySummary(records: MemoryRecord[], ratings: Map<string, RatingRecord>): string {
+  const total = records.length;
+  const rated = ratings.size;
+  const counts: Record<Verdict, number> = { good: 0, junk: 0, miscategorized: 0 };
+  const byCat: Record<string, Record<Verdict, number>> = {};
+  for (const r of records) {
+    const v = ratings.get(r.id)?.verdict;
+    if (!v) continue;
+    counts[v]++;
+    (byCat[r.category] ??= { good: 0, junk: 0, miscategorized: 0 })[v]++;
+  }
+  const pct = (n: number) => (rated ? Math.round((n / rated) * 100) : 0);
+  const lines: string[] = [];
+  lines.push(`## Remnic capture-accuracy rollup (${new Date().toISOString().slice(0, 10)})`);
+  lines.push("");
+  lines.push(`- Rated: ${rated} / ${total} memories`);
+  lines.push(`- 👍 good: ${counts.good} (${pct(counts.good)}%)`);
+  lines.push(`- 👎 junk: ${counts.junk} (${pct(counts.junk)}%)`);
+  lines.push(`- ⚠ miscategorized: ${counts.miscategorized} (${pct(counts.miscategorized)}%)`);
+  lines.push("");
+  lines.push("| Category | good | junk | miscat |");
+  lines.push("| --- | --- | --- | --- |");
+  for (const cat of Object.keys(byCat).sort()) {
+    const c = byCat[cat];
+    lines.push(`| ${cat} | ${c.good} | ${c.junk} | ${c.miscategorized} |`);
+  }
+  return lines.join("\n") + "\n";
 }
