@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Remnic · /mem-stats</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header id="overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="spark" id="spark" title="captures per day (last 14d)"></div>
+  </header>
+  <main>
+    <section id="list-pane">
+      <div class="controls">
+        <input id="search" type="search" placeholder="search preview + content…" />
+        <div id="chips" class="chips"></div>
+      </div>
+      <ul id="list"></ul>
+      <button id="summary-btn" title="copy accuracy summary markdown">⧉ accuracy summary</button>
+    </section>
+    <section id="detail-pane"><p class="empty">Select a memory to view + rate.</p></section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
