@@ -1,2 +1,8 @@
 .DS_Store
 *.bak
+
+# remnic connector token (secret; machine/daemon-specific, do not commit)
+extensions/remnic/remnic.config.json
+
+# superpowers brainstorm scratch (visual companion)
+.superpowers/
