@@ -2,15 +2,24 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { execFile } from "node:child_process";
 
 /**
- * git-freshness-check — warn when the local branch is behind its upstream so
- * neither user nor agent trusts a stale tree.
+ * git-freshness-check — keep the local branch synced with its upstream, or
+ * else make sure neither user nor agent trusts a stale/ambiguous tree.
+ *
+ * When drift is provably safe (behind > 0, ahead == 0, clean tree, fetch ok)
+ * it silently runs `git pull --ff-only`. Everything else (dirty tree,
+ * diverged history, fetch failure) surfaces a case-specific next step instead
+ * of auto-pulling.
  *
  * Non-obvious choices:
  * - Compares HEAD against its OWN upstream (@{u}), not origin/main, so feature
  *   branches legitimately behind main don't trigger it.
  * - Fetch runs with no credential prompt and a timeout; on failure it degrades
  *   to "freshness unverified" rather than hanging startup.
- * - Warning is injected into the first agent turn, not just shown in the widget.
+ * - Auto-pull only fires when ff-only is guaranteed safe; if it unexpectedly
+ *   fails (e.g. upstream advanced mid-check) we fall through to the blocked
+ *   path instead of retrying or forcing.
+ * - Case-specific guidance is injected into the first agent turn, not just
+ *   shown in the widget, so the agent itself refuses to act on bad state.
  */
 
 const FETCH_TIMEOUT_MS = 15_000;
