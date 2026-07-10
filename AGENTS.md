@@ -10,6 +10,37 @@ This rule is about prose only. Do **not** change filename or note-title
 conventions: the Obsidian vault task-system deliberately uses ` — ` (em-dash)
 separators in note titles and filenames, and those must stay intact.
 
+## Code comments — minimal, never prose
+
+Keep inline comments in code modules to a minimum. Never write prose in code.
+A comment only earns its place when it removes ambiguity that the code itself
+cannot: the *why* behind a non-obvious or counter-intuitive choice, a workaround
+for a known bug, an intentional anti-pattern adopted for a specific reason, or a
+constraint that is not visible in the surrounding code.
+
+Do **not** write:
+- Prose paragraphs explaining what the code does (the code already says it).
+- "Tips and tricks" or general background about how a tool/pattern works.
+- Comments that restate the line below them.
+- Tutorial-style notes for a hypothetical reader.
+
+The goal is to reduce ambiguity, not to narrate. When in doubt, leave it out.
+
+Counter-example — this comment should never exist; it is prose plus general
+tips that add nothing the code doesn't already convey:
+
+```hcl
+# Self-impersonation token-creator is needed by ad-hoc scripts that follow
+# the same pattern as scripts/enable-ge-observability.sh (gcloud auth
+# print-access-token under impersonation). Cheap to grant; harmless without
+# a separate principal allowed to impersonate.
+resource "google_project_iam_member" "ci_token_creator" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountTokenCreator"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+```
+
 ## Git-backed config & skills — commit and push after edits
 
 Two personal repos back parts of this environment. When you edit files under
