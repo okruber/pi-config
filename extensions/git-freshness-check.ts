@@ -2,22 +2,15 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { execFile } from "node:child_process";
 
 /**
- * git-freshness-check
+ * git-freshness-check — warn when the local branch is behind its upstream so
+ * neither user nor agent trusts a stale tree.
  *
- * Sync-before-trust guardrail. On session start it fetches the current branch's
- * upstream and, if the local branch is behind, warns loudly — so neither the
- * user nor the agent acts on a stale working tree (the "main was 59 commits
- * behind" failure mode).
- *
- * Design notes:
- * - Compares HEAD against its OWN upstream (@{u}), not against origin/main.
- *   That precisely catches "local main behind origin/main" without firing on
- *   feature branches that are legitimately behind main.
- * - Never prompts for credentials (GIT_TERMINAL_PROMPT=0, SSH BatchMode) and
- *   bounds the fetch with a timeout, so a private/unauthenticated repo degrades
- *   to a "freshness unverified" warning instead of hanging startup.
- * - Injects the warning into the first agent turn so the model itself refuses
- *   to trust the tree, not just the human.
+ * Non-obvious choices:
+ * - Compares HEAD against its OWN upstream (@{u}), not origin/main, so feature
+ *   branches legitimately behind main don't trigger it.
+ * - Fetch runs with no credential prompt and a timeout; on failure it degrades
+ *   to "freshness unverified" rather than hanging startup.
+ * - Warning is injected into the first agent turn, not just shown in the widget.
  */
 
 const FETCH_TIMEOUT_MS = 15_000;
@@ -32,7 +25,6 @@ type Drift = {
   fetchError?: string;
 };
 
-// Session-scoped state.
 let drift: Drift | null = null;
 let injected = false;
 
