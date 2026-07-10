@@ -121,12 +121,17 @@ async function syncFastForward(
 }
 
 function summarize(d: Drift): string {
+  if (d.behind > 0 && d.dirty) {
+    return `${d.branch} is ${d.behind} commit(s) behind ${d.upstream}, but the working tree has uncommitted changes. Commit or git stash, then git pull --ff-only.`;
+  }
+  if (d.behind > 0 && d.ahead > 0) {
+    return `${d.branch} has diverged from ${d.upstream} (${d.behind} behind, ${d.ahead} ahead). Reconcile with git pull --rebase, or review before merging.`;
+  }
   if (d.behind > 0) {
-    const aheadNote = d.ahead > 0 ? ` (and ${d.ahead} ahead — diverged)` : "";
-    return `${d.branch} is ${d.behind} commit(s) behind ${d.upstream}${aheadNote}. Sync before trusting the tree: git pull --ff-only (or rebase).`;
+    return `${d.branch} is ${d.behind} commit(s) behind ${d.upstream}. Sync before trusting the tree: git pull --ff-only.`;
   }
   if (d.fetchFailed) {
-    return `Could not fetch ${d.upstream} (freshness unverified): ${d.fetchError ?? "fetch failed"}. Check auth before trusting the tree.`;
+    return `Could not fetch ${d.upstream} (freshness unverified): ${d.fetchError ?? "fetch failed"}. Check auth/network before trusting the tree.`;
   }
   return `${d.branch} is up to date with ${d.upstream}.`;
 }
@@ -137,10 +142,16 @@ function notify(d: Drift, ctx: ExtensionContext): void {
   try {
     if (d.behind > 0) {
       ctx.ui.notify(`⚠ Stale tree: ${msg}`, "warning");
-      ctx.ui.setWidget(WIDGET_KEY, [`⚠ ${d.behind} behind ${d.upstream} — sync before trusting`]);
+      ctx.ui.setWidget(WIDGET_KEY, (_tui, theme) => ({
+        render: () => [theme.fg("warning", `⚠ ${d.behind} behind ${d.upstream}`)],
+        invalidate: () => {},
+      }));
     } else if (d.fetchFailed) {
       ctx.ui.notify(`⚠ ${msg}`, "warning");
-      ctx.ui.setWidget(WIDGET_KEY, [`⚠ ${d.upstream}: fetch failed — freshness unverified`]);
+      ctx.ui.setWidget(WIDGET_KEY, (_tui, theme) => ({
+        render: () => [theme.fg("warning", `⚠ ${d.upstream}: fetch failed`)],
+        invalidate: () => {},
+      }));
     } else {
       ctx.ui.setWidget(WIDGET_KEY, []);
     }
@@ -191,7 +202,7 @@ export default function (pi: ExtensionAPI) {
     injected = true;
     const warning =
       drift.behind > 0
-        ? `The local working tree is STALE: ${summarize(drift)} Do not trust file contents, reviews, or diffs from this checkout until it is synced. If your task depends on repo state, sync first (git pull --ff-only) or tell the user.`
+        ? `The local working tree is STALE: ${summarize(drift)} Do not trust file contents, reviews, or diffs from this checkout until it is synced.`
         : `Repo freshness is UNVERIFIED: ${summarize(drift)} Warn the user before relying on repo state.`;
     return {
       systemPrompt: `${event.systemPrompt}\n\n[git-freshness-check] ${warning}`,
