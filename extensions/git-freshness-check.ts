@@ -112,6 +112,14 @@ function isSafeToSync(d: Drift): boolean {
   return d.behind > 0 && d.ahead === 0 && !d.dirty && !d.fetchFailed;
 }
 
+async function syncFastForward(
+  cwd: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await git(["pull", "--ff-only"], cwd, FETCH_TIMEOUT_MS);
+  if (res.code === 0) return { ok: true };
+  return { ok: false, error: res.stderr.split("\n")[0] || "pull failed" };
+}
+
 function summarize(d: Drift): string {
   if (d.behind > 0) {
     const aheadNote = d.ahead > 0 ? ` (and ${d.ahead} ahead — diverged)` : "";
@@ -150,7 +158,27 @@ export default function (pi: ExtensionAPI) {
     } catch {
       drift = null;
     }
-    if (drift && (drift.behind > 0 || drift.fetchFailed)) {
+    if (!drift) return;
+
+    if (isSafeToSync(drift)) {
+      const synced = drift.behind;
+      const res = await syncFastForward(ctx.cwd);
+      if (res.ok) {
+        drift = { ...drift, behind: 0, ahead: 0 };
+        if (ctx.hasUI) {
+          try {
+            ctx.ui.notify(`✓ Synced ${synced} commit(s) from upstream`, "info");
+            ctx.ui.setWidget(WIDGET_KEY, []);
+          } catch {
+            // best-effort
+          }
+        }
+        return;
+      }
+      // Fall through: pull failed unexpectedly (e.g. upstream advanced past ff).
+    }
+
+    if (drift.behind > 0 || drift.fetchFailed) {
       notify(drift, ctx);
     }
   });
