@@ -20,6 +20,31 @@ function openInObsidian(fileRelPath: string): Promise<void> {
 	});
 }
 
+function closeRedirectorTabsOnce(): void {
+	execFile("orca", ["tab", "list", "--json", "--worktree", "all"], (err, stdout) => {
+		if (err) return;
+		let tabs: Array<{ browserPageId?: string; url?: string }> = [];
+		try {
+			tabs = JSON.parse(stdout)?.result?.tabs ?? [];
+		} catch {
+			return;
+		}
+		for (const tab of tabs) {
+			if (tab.browserPageId && typeof tab.url === "string" && tab.url.includes(`${HOST}:${PORT}`)) {
+				execFile("orca", ["tab", "close", "--page", tab.browserPageId], () => {});
+			}
+		}
+	});
+}
+
+// Orca opens http links in an embedded browser tab; poll briefly so the tab is
+// registered before we close it, and cover rapid multi-clicks.
+function closeRedirectorTabs(): void {
+	for (const delay of [150, 400, 800, 1500]) {
+		setTimeout(closeRedirectorTabsOnce, delay).unref?.();
+	}
+}
+
 function forceHyperlinks(): void {
 	const caps = getCapabilities() ?? detectCapabilities();
 	if (caps.hyperlinks) return;
@@ -33,9 +58,18 @@ function startServer(): void {
 			const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
 			if (url.pathname === "/o") {
 				const file = url.searchParams.get("file");
-				if (file) void openInObsidian(file);
-				res.statusCode = 204;
-				res.end();
+				if (file) {
+					void openInObsidian(file);
+					closeRedirectorTabs();
+				}
+				res.statusCode = 200;
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				res.end(
+					"<!doctype html><meta charset=utf-8><title>Opening in Obsidian</title>" +
+						'<body style="font:14px system-ui;color:#888;background:#1e1e1e;margin:2rem">' +
+						"Opening in Obsidian\u2026 you can close this tab." +
+						"<script>window.close()</script>",
+				);
 				return;
 			}
 			res.statusCode = 404;
