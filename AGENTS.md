@@ -26,6 +26,9 @@ Do **not** write:
 
 The goal is to reduce ambiguity, not to narrate. When in doubt, leave it out.
 
+Whatever you do keep must be factually correct and up to date. A stale or
+misleading comment is worse than no comment - delete rather than let it rot.
+
 Counter-example — this comment should never exist; it is prose plus general
 tips that add nothing the code doesn't already convey:
 
