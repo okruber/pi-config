@@ -10,6 +10,22 @@ This rule is about prose only. Do **not** change filename or note-title
 conventions: the Obsidian vault task-system deliberately uses ` — ` (em-dash)
 separators in note titles and filenames, and those must stay intact.
 
+## Obsidian vault file references — render as clickable links
+
+When replying inside the OEK Obsidian vault (cwd under `.../Oek Vault`) and I
+reference a specific vault file, render it as a Markdown link whose URL opens
+the note in Obsidian:
+
+```
+[Note title](obsidian://open?vault=Oek%20Vault&file=<url-encoded-vault-relative-path>)
+```
+
+URL-encode the path (spaces `%20`, `—` etc.); keep the `.md` extension. The
+`obsidian-links` extension forces pi's terminal hyperlink capability on so these
+render as clickable OSC 8 links. If a click does not open Obsidian, use the
+`open_in_obsidian` tool as a fallback. Only linkify real, specific vault files,
+not every path mentioned.
+
 ## Code comments — minimal, never prose
 
 Keep inline comments in code modules to a minimum. Never write prose in code.
