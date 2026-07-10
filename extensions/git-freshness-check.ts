@@ -21,6 +21,7 @@ type Drift = {
   upstream: string;
   behind: number;
   ahead: number;
+  dirty: boolean;
   fetchFailed: boolean;
   fetchError?: string;
 };
@@ -93,14 +94,22 @@ async function checkFreshness(cwd: string): Promise<Drift | null> {
   const behind = Number.parseInt(behindRes.stdout || "0", 10) || 0;
   const ahead = Number.parseInt(aheadRes.stdout || "0", 10) || 0;
 
+  const statusRes = await git(["status", "--porcelain"], cwd);
+  const dirty = statusRes.code === 0 && statusRes.stdout.length > 0;
+
   return {
     branch,
     upstream,
     behind,
     ahead,
+    dirty,
     fetchFailed,
     fetchError: fetchFailed ? fetchRes.stderr.split("\n")[0] : undefined,
   };
+}
+
+function isSafeToSync(d: Drift): boolean {
+  return d.behind > 0 && d.ahead === 0 && !d.dirty && !d.fetchFailed;
 }
 
 function summarize(d: Drift): string {
