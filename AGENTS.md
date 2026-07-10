@@ -13,18 +13,20 @@ separators in note titles and filenames, and those must stay intact.
 ## Obsidian vault file references — render as clickable links
 
 When replying inside the OEK Obsidian vault (cwd under `.../Oek Vault`) and I
-reference a specific vault file, render it as a Markdown link whose URL opens
-the note in Obsidian:
+reference a specific vault file, render it as a clickable Markdown link:
 
 ```
-[Note title](obsidian://open?vault=Oek%20Vault&file=<url-encoded-vault-relative-path>)
+[Note title](http://127.0.0.1:51888/o?file=<url-encoded-vault-relative-path>)
 ```
 
-URL-encode the path (spaces `%20`, `—` etc.); keep the `.md` extension. The
-`obsidian-links` extension forces pi's terminal hyperlink capability on so these
-render as clickable OSC 8 links. If a click does not open Obsidian, use the
-`open_in_obsidian` tool as a fallback. Only linkify real, specific vault files,
-not every path mentioned.
+URL-encode the path (spaces `%20`, `—` etc.); keep the `.md` extension. Do **not**
+use a bare `obsidian://` URL as the link target: Orca's terminal strips non-http
+schemes on click, so those are not clickable. The `obsidian-links` extension
+forces pi's OSC 8 hyperlink capability on and runs a localhost redirector on
+`127.0.0.1:51888` that execs `open obsidian://…`, so an http link to `/o?file=`
+opens the note in Obsidian on click. The redirector only runs while pi is open.
+If a click does not open Obsidian, use the `open_in_obsidian` tool as a fallback.
+Only linkify real, specific vault files, not every path mentioned.
 
 ## Code comments — minimal, never prose
 
