@@ -10,6 +10,37 @@ This rule is about prose only. Do **not** change filename or note-title
 conventions: the Obsidian vault task-system deliberately uses ` — ` (em-dash)
 separators in note titles and filenames, and those must stay intact.
 
+## Human-facing technical docs and instructions — plain, unambiguous prose (ASD-STE100-inspired)
+
+Applies wherever you write or say this kind of content, in a file or in a
+chat reply: READMEs, runbooks, setup and troubleshooting guides, PR
+descriptions, issue reports, release notes, API or architecture docs and
+explanations, and any time you give me step-by-step instructions. Write
+short, unambiguous prose in the style of ASD-STE100 Simplified Technical
+English:
+
+- One instruction per sentence. For procedures, use the imperative ("Run the
+  migration.") and put any condition before the command ("If the build
+  fails, read the log.").
+- Keep sentences under about 20 words for instructions, 25 for explanations.
+  Split anything longer.
+- Active voice. Simple tenses only - no "has been", no "is being", no
+  present perfect.
+- Ban should/would/may/might/could as hedges. Write "must" for a
+  requirement, "can" for a possibility, or state it as fact.
+- One term per concept, used consistently through a document or reply (pick
+  "config" or "settings", not both, and stick with it).
+- No filler: leverage, utilize, seamlessly, robust, comprehensive, in order
+  to, it's worth noting that, and similar padding get deleted, not replaced.
+  Write "use" for leverage/utilize, "to" for "in order to".
+- Keep articles and "that" - this is short, not terse. Don't strip words to
+  save length.
+
+Does not apply to casual back-and-forth, brainstorming or exploratory
+discussion, commit messages, or prose in vault notes - keep those in normal
+conversational style, subject to the no-em-dash and code-comments rules
+above.
+
 ## Obsidian vault file references — render as clickable links
 
 When replying inside the OEK Obsidian vault (cwd under `.../Oek Vault`) and I
