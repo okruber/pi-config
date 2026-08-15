@@ -10,7 +10,25 @@
       },
       "models": [
         {
-          "id": "qwen3.8-27b",
+          "id": "qwen3.5-35b-a3b",
+          "name": "Qwen 3.5 35B A3B MoE Q4_K_M (LM Studio)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "lmstudio-community/qwen3.8-27b",
+          "name": "Qwen 3.8 27B dense Q4_K_M (LM Studio)",
+          "reasoning": false,
+          "input": ["text", "image"],
+          "contextWindow": 65536,
+          "maxTokens": 16384,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "unsloth/qwen3.8-27b",
           "name": "Qwen 3.8 27B UD-Q6_K_XL (LM Studio)",
           "reasoning": false,
           "input": ["text", "image"],

@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.1",
-  "defaultProvider": "openrouter",
-  "defaultModel": "deepseek/deepseek-v4-flash-0731",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-5",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
@@ -9,7 +9,8 @@
     "npm:pi-subagents",
     "npm:pi-mcp-adapter",
     "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:pi-web-access"
+    "npm:pi-web-access",
+    "npm:@ff-labs/pi-fff"
   ],
   "enabledModels": [
     "anthropic/claude-sonnet-5",
