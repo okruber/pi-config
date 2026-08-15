@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.1",
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-5",
+  "defaultProvider": "lmstudio",
+  "defaultModel": "qwen3.8-27b",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
