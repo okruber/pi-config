@@ -1,14 +1,15 @@
 {
   "lastChangelogVersion": "0.84.1",
-  "defaultProvider": "lmstudio",
-  "defaultModel": "qwen3.8-27b",
+  "defaultProvider": "openrouter",
+  "defaultModel": "deepseek/deepseek-v4-flash-0731",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
     "git:github.com/obra/superpowers",
     "npm:pi-subagents",
     "npm:pi-mcp-adapter",
-    "npm:@juicesharp/rpiv-ask-user-question"
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:pi-web-access"
   ],
   "enabledModels": [
     "anthropic/claude-sonnet-5",
