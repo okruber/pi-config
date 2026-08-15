@@ -10,6 +10,15 @@
       },
       "models": [
         {
+          "id": "gemma-4-26b-a4b-it-qat-mlx",
+          "name": "Gemma 4 26B A4B QAT MLX-4bit (LM Studio)",
+          "reasoning": false,
+          "input": ["text", "image"],
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
           "id": "qwen3.5-35b-a3b",
           "name": "Qwen 3.5 35B A3B MoE Q4_K_M (LM Studio)",
           "reasoning": true,
