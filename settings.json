@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.84.1",
+  "lastChangelogVersion": "0.84.2",
   "defaultProvider": "lmstudio",
   "defaultModel": "qwen3.5-35b-a3b",
   "defaultThinkingLevel": "high",
@@ -10,7 +10,8 @@
     "npm:pi-mcp-adapter",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-web-access",
-    "npm:@ff-labs/pi-fff"
+    "npm:@ff-labs/pi-fff",
+    "npm:pi-cache-optimizer"
   ],
   "enabledModels": [
     "anthropic/claude-sonnet-5",
