@@ -15,7 +15,8 @@ const CHEVRON = "\uE0B2";
 const STATUS_BRIDGE = Symbol.for("omp.footer.statuses.v1");
 const CACHE_STATUS_KEY = "pi-cache-stats";
 
-type Segment = { label: string; fg: string };
+type Color = { fg: string; bg?: string };
+type Segment = { label: string; color: Color };
 
 let currentCtx: ExtensionContext | undefined;
 let currentTui: { requestRender(): void } | undefined;
@@ -32,27 +33,27 @@ export function rateLabel(isStreaming: boolean, rate: number): string {
 	return ` ${isStreaming ? formatRate(rate) : "0"} tok/s `;
 }
 
-function hexToFgAnsi(hex: string): string {
-	const r = parseInt(hex.slice(1, 3), 16);
-	const g = parseInt(hex.slice(3, 5), 16);
-	const b = parseInt(hex.slice(5, 7), 16);
-	return `\x1b[38;2;${r};${g};${b}m`;
-}
-
 // Named color from the theme's vars; accent is the fallback for themes without it.
-function getSegmentFg(theme: Theme, varName: string): string {
+// Themes that resolve to a hex value also yield a background form, which the
+// powerline separator needs to sit on the preceding segment.
+export function themeColor(theme: Theme, varName: string): Color {
 	try {
 		if (theme.sourcePath) {
 			const parsed = JSON.parse(readFileSync(theme.sourcePath, "utf8")) as {
 				vars?: Record<string, string>;
 			};
-			const value = parsed.vars?.[varName];
-			if (value && /^#[0-9a-fA-F]{6}$/.test(value)) return hexToFgAnsi(value);
+			const hex = parsed.vars?.[varName];
+			if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) {
+				const r = parseInt(hex.slice(1, 3), 16);
+				const g = parseInt(hex.slice(3, 5), 16);
+				const b = parseInt(hex.slice(5, 7), 16);
+				return { fg: `\x1b[38;2;${r};${g};${b}m`, bg: `\x1b[48;2;${r};${g};${b}m` };
+			}
 		}
 	} catch {
 		// fall through to accent
 	}
-	return theme.getFgAnsi("accent");
+	return { fg: theme.getFgAnsi("accent") };
 }
 
 export function cacheLabel(status: string | undefined): string | undefined {
@@ -100,21 +101,30 @@ export function buildSegments(width: number, segments: Segment[]): string[] {
 	while (fitted.length > 0 && rowWidth() > width) fitted.shift();
 	if (fitted.length === 0) return [];
 
-	// Chevron takes the segment color on the default background; the label
-	// inverts it so its letters render in the terminal's own background color.
 	const body = fitted
-		.map(({ label, fg }) => `${fg}${CHEVRON}\x1b[39m\x1b[7m${fg}${label}\x1b[27m\x1b[39m`)
+		.map(({ label, color }, index) => {
+			// The separator carries the previous segment's color as its background so
+			// the two blocks meet edge to edge. The leftmost one sits on the terminal
+			// background, and a theme without a hex value degrades to that too.
+			const behind = index > 0 ? fitted[index - 1].color.bg : undefined;
+			const chevron = behind
+				? `${behind}${color.fg}${CHEVRON}\x1b[39m\x1b[49m`
+				: `${color.fg}${CHEVRON}\x1b[39m`;
+			// Inverting the label paints the block in the segment color and draws the
+			// letters in the terminal's own background color.
+			return `${chevron}\x1b[7m${color.fg}${label}\x1b[27m\x1b[39m`;
+		})
 		.join("");
 	return [" ".repeat(width - rowWidth()) + body];
 }
 
-function renderRow(width: number, teal: string, peach: string): string[] {
+function renderRow(width: number, teal: Color, peach: Color): string[] {
 	if (width < 4) return [];
 
 	const segments: Segment[] = [];
 	const cache = cacheLabel(readCacheStatus());
-	if (cache) segments.push({ label: cache, fg: peach });
-	segments.push({ label: rateLabel(streaming, currentRate()), fg: teal });
+	if (cache) segments.push({ label: cache, color: peach });
+	segments.push({ label: rateLabel(streaming, currentRate()), color: teal });
 
 	return buildSegments(width, segments);
 }
@@ -127,8 +137,8 @@ export default function (pi: ExtensionAPI) {
 			WIDGET_KEY,
 			(tui) => {
 				currentTui = tui;
-				let teal: string | undefined;
-				let peach: string | undefined;
+				let teal: Color | undefined;
+				let peach: Color | undefined;
 				return {
 					invalidate() {
 						teal = undefined;
@@ -140,8 +150,8 @@ export default function (pi: ExtensionAPI) {
 					render(width: number): string[] {
 						if (!currentCtx) return [];
 						const theme = currentCtx.ui.theme;
-						if (!teal) teal = getSegmentFg(theme, "teal");
-						if (!peach) peach = getSegmentFg(theme, "peach");
+						if (!teal) teal = themeColor(theme, "teal");
+						if (!peach) peach = themeColor(theme, "peach");
 						return renderRow(width, teal, peach);
 					},
 				};
