@@ -10,6 +10,12 @@ import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
 const SEP = '›'
 const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]/g
 
+// ctx.ui.setStatus() values are reachable only through a setFooter callback.
+// This footer draws nothing, so it republishes them for the belowEditor widgets.
+const STATUS_BRIDGE = Symbol.for('omp.footer.statuses.v1')
+
+type StatusBridge = { version: 1; getStatuses(): ReadonlyMap<string, string> }
+
 class EmptyFooter implements Component {
   render(): string[] {
     return []
@@ -156,7 +162,14 @@ export default function (pi: ExtensionAPI) {
   })
 
   pi.on('session_start', (_event, ctx) => {
-    ctx.ui.setFooter(() => new EmptyFooter())
+    ctx.ui.setFooter((_tui, _theme, footerData) => {
+      const bridge: StatusBridge = {
+        version: 1,
+        getStatuses: () => footerData.getExtensionStatuses(),
+      }
+      ;(globalThis as Record<symbol, unknown>)[STATUS_BRIDGE] = bridge
+      return new EmptyFooter()
+    })
 
     const refreshBranch = async () => {
       const result = await pi.exec('git', ['branch', '--show-current'], { cwd: ctx.cwd }).catch(() => undefined)

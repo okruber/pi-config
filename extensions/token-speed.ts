@@ -5,9 +5,17 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 const WIDGET_KEY = "token-speed";
 const CHARS_PER_TOKEN = 4;
 const RENDER_INTERVAL_MS = 500;
+const STATUS_SETTLE_MS = 250;
 
 // Powerline left wedge (U+E0B2), supplied by Symbols Nerd Font as a fallback glyph.
 const CHEVRON = "\uE0B2";
+
+// omp-chatbox.ts republishes ctx.ui.setStatus() values here; its empty footer
+// would otherwise swallow them.
+const STATUS_BRIDGE = Symbol.for("omp.footer.statuses.v1");
+const CACHE_STATUS_KEY = "pi-cache-stats";
+
+type Segment = { label: string; fg: string };
 
 let currentCtx: ExtensionContext | undefined;
 let currentTui: { requestRender(): void } | undefined;
@@ -27,20 +35,35 @@ function hexToFgAnsi(hex: string): string {
 	return `\x1b[38;2;${r};${g};${b}m`;
 }
 
-// Teal from the theme's vars; accent is the fallback for themes without a teal var.
-function getSegmentFg(theme: Theme): string {
+// Named color from the theme's vars; accent is the fallback for themes without it.
+function getSegmentFg(theme: Theme, varName: string): string {
 	try {
 		if (theme.sourcePath) {
 			const parsed = JSON.parse(readFileSync(theme.sourcePath, "utf8")) as {
 				vars?: Record<string, string>;
 			};
-			const teal = parsed.vars?.teal;
-			if (teal && /^#[0-9a-fA-F]{6}$/.test(teal)) return hexToFgAnsi(teal);
+			const value = parsed.vars?.[varName];
+			if (value && /^#[0-9a-fA-F]{6}$/.test(value)) return hexToFgAnsi(value);
 		}
 	} catch {
 		// fall through to accent
 	}
 	return theme.getFgAnsi("accent");
+}
+
+export function cacheLabel(status: string | undefined): string | undefined {
+	if (!status?.trim()) return undefined;
+	const percents = [...status.matchAll(/(\d+(?:\.\d+)?)%/g)];
+	const rate = percents.at(-1)?.[1];
+	if (!rate) return undefined;
+	return ` ${rate}% cache${status.includes("⚠️") ? " ⚠️" : ""} `;
+}
+
+function readCacheStatus(): string | undefined {
+	const bridge = (globalThis as Record<symbol, unknown>)[STATUS_BRIDGE] as
+		| { getStatuses?: () => ReadonlyMap<string, string> }
+		| undefined;
+	return bridge?.getStatuses?.().get(CACHE_STATUS_KEY);
 }
 
 function currentRate(): number {
@@ -66,18 +89,30 @@ function stopStreaming(): void {
 	currentTui?.requestRender();
 }
 
-function renderSegment(width: number, fg: string): string[] {
-	if (!streaming || width < 4) return [];
+export function buildSegments(width: number, segments: Segment[]): string[] {
+	const fitted = [...segments];
+	const rowWidth = () => fitted.reduce((sum, seg) => sum + visibleWidth(seg.label) + 1, 0);
+	// Rightmost segment wins the space: drop from the left until the row fits.
+	while (fitted.length > 0 && rowWidth() > width) fitted.shift();
+	if (fitted.length === 0) return [];
 
-	const label = ` ${formatRate(currentRate())} tok/s `;
-	const segmentWidth = visibleWidth(label) + 1;
-	if (segmentWidth > width) return [];
+	// Chevron takes the segment color on the default background; the label
+	// inverts it so its letters render in the terminal's own background color.
+	const body = fitted
+		.map(({ label, fg }) => `${fg}${CHEVRON}\x1b[39m\x1b[7m${fg}${label}\x1b[27m\x1b[39m`)
+		.join("");
+	return [" ".repeat(width - rowWidth()) + body];
+}
 
-	// Chevron is teal on the default background; the label inverts teal into the
-	// background so its letters render in the terminal's own background color.
-	const chevron = `${fg}${CHEVRON}\x1b[39m`;
-	const segment = `\x1b[7m${fg}${label}\x1b[27m\x1b[39m`;
-	return [" ".repeat(width - segmentWidth) + chevron + segment];
+function renderRow(width: number, teal: string, peach: string): string[] {
+	if (width < 4) return [];
+
+	const segments: Segment[] = [];
+	const cache = cacheLabel(readCacheStatus());
+	if (cache) segments.push({ label: cache, fg: peach });
+	if (streaming) segments.push({ label: ` ${formatRate(currentRate())} tok/s `, fg: teal });
+
+	return buildSegments(width, segments);
 }
 
 export default function (pi: ExtensionAPI) {
@@ -88,18 +123,22 @@ export default function (pi: ExtensionAPI) {
 			WIDGET_KEY,
 			(tui) => {
 				currentTui = tui;
-				let fg: string | undefined;
+				let teal: string | undefined;
+				let peach: string | undefined;
 				return {
 					invalidate() {
-						fg = undefined;
+						teal = undefined;
+						peach = undefined;
 					},
 					dispose() {
 						stopStreaming();
 					},
 					render(width: number): string[] {
 						if (!currentCtx) return [];
-						if (!fg) fg = getSegmentFg(currentCtx.ui.theme);
-						return renderSegment(width, fg);
+						const theme = currentCtx.ui.theme;
+						if (!teal) teal = getSegmentFg(theme, "teal");
+						if (!peach) peach = getSegmentFg(theme, "peach");
+						return renderRow(width, teal, peach);
 					},
 				};
 			},
@@ -125,6 +164,12 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	pi.on("message_end", () => stopStreaming());
+	pi.on("message_end", () => {
+		stopStreaming();
+		// pi-cache-optimizer writes its status asynchronously after this event,
+		// so one extra render picks up the new numbers instead of the stale ones.
+		setTimeout(() => currentTui?.requestRender(), STATUS_SETTLE_MS).unref?.();
+	});
+
 	pi.on("agent_end", () => stopStreaming());
 }
