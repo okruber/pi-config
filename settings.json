@@ -13,6 +13,7 @@
     "npm:@ff-labs/pi-fff",
     "npm:pi-cache-optimizer"
   ],
+  "skills": ["!skills/google-agents-cli-*"],
   "enabledModels": [
     "anthropic/claude-sonnet-5",
     "anthropic/claude-opus-5",
