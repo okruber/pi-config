@@ -1,11 +1,21 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 const WIDGET_KEY = "token-speed";
 const CHARS_PER_TOKEN = 4;
 const RENDER_INTERVAL_MS = 500;
-const STATUS_SETTLE_MS = 250;
+// pi-cache-optimizer debounces its disk write by 2s, so a later re-render is
+// what actually picks up the finished turn.
+const STATS_SETTLE_MS = 2500;
+
+const STATS_FILE = join(
+	process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
+	"pi-cache-optimizer-stats.json",
+);
 
 // Powerline left wedge (U+E0B2), supplied by Symbols Nerd Font as a fallback glyph.
 const CHEVRON = "\uE0B2";
@@ -17,6 +27,20 @@ const CACHE_STATUS_KEY = "pi-cache-stats";
 
 type Color = { fg: string; bg?: string };
 type Segment = { label: string; color: Color };
+export type CacheCounters = {
+	day: string;
+	totalRequests: number;
+	hitRequests: number;
+	cachedInputTokens: number;
+	totalInputTokens: number;
+};
+type PersistedStats = {
+	sessions?: Record<string, Record<string, CacheCounters>>;
+	totalsByModel?: Record<string, CacheCounters>;
+};
+
+let sessionHash: string | undefined;
+let statsCache: { mtimeMs: number; data: PersistedStats } | undefined;
 
 let currentCtx: ExtensionContext | undefined;
 let currentTui: { requestRender(): void } | undefined;
@@ -56,19 +80,60 @@ export function themeColor(theme: Theme, varName: string): Color {
 	return { fg: theme.getFgAnsi("accent") };
 }
 
-export function cacheLabel(status: string | undefined): string | undefined {
-	if (!status?.trim()) return undefined;
-	const percents = [...status.matchAll(/(\d+(?:\.\d+)?)%/g)];
-	const rate = percents.at(-1)?.[1];
-	if (!rate) return undefined;
-	return ` ${rate}% cache${status.includes("⚠️") ? " ⚠️" : ""} `;
-}
-
 function readCacheStatus(): string | undefined {
 	const bridge = (globalThis as Record<symbol, unknown>)[STATUS_BRIDGE] as
 		| { getStatuses?: () => ReadonlyMap<string, string> }
 		| undefined;
 	return bridge?.getStatuses?.().get(CACHE_STATUS_KEY);
+}
+
+// Same shape as pi-cache-optimizer's own formatTokenCount, so the powerline and
+// /cache-optimizer stats never disagree.
+export function formatTokens(value: number): string {
+	const millions = Math.max(0, Math.round(value)) / 1_000_000;
+	if (millions === 0) return "0M";
+	if (millions < 0.001) return `${millions.toFixed(4)}M`;
+	if (millions < 0.01) return `${millions.toFixed(3)}M`;
+	if (millions >= 10) return `${millions.toFixed(1)}M`;
+	return `${millions.toFixed(2)}M`;
+}
+
+function localDay(): string {
+	const now = new Date();
+	const month = String(now.getMonth() + 1).padStart(2, "0");
+	const day = String(now.getDate()).padStart(2, "0");
+	return `${now.getFullYear()}-${month}-${day}`;
+}
+
+// Counters from a previous day are stale: the optimizer resets them on rollover.
+export function usableCounters(counters: CacheCounters | undefined, today: string): CacheCounters | undefined {
+	if (!counters || counters.day !== today || counters.totalInputTokens <= 0) return undefined;
+	return counters;
+}
+
+export function hitPercent(counters: CacheCounters): string {
+	return `${((counters.cachedInputTokens / counters.totalInputTokens) * 100).toFixed(1)}%`;
+}
+
+export function sessionLabel(counters: CacheCounters, warned: boolean): string {
+	const tokens = `${formatTokens(counters.cachedInputTokens)}/${formatTokens(counters.totalInputTokens)}`;
+	return ` ${counters.hitRequests}/${counters.totalRequests} · ${tokens} · ${hitPercent(counters)}${warned ? " ⚠️" : ""} `;
+}
+
+export function dayLabel(counters: CacheCounters): string {
+	return ` ${hitPercent(counters)} day `;
+}
+
+function readStats(): PersistedStats | undefined {
+	try {
+		const mtimeMs = statSync(STATS_FILE).mtimeMs;
+		if (statsCache?.mtimeMs !== mtimeMs) {
+			statsCache = { mtimeMs, data: JSON.parse(readFileSync(STATS_FILE, "utf8")) as PersistedStats };
+		}
+		return statsCache.data;
+	} catch {
+		return undefined;
+	}
 }
 
 function currentRate(): number {
@@ -118,13 +183,29 @@ export function buildSegments(width: number, segments: Segment[]): string[] {
 	return [" ".repeat(width - rowWidth()) + body];
 }
 
-function renderRow(width: number, teal: Color, peach: Color): string[] {
+function renderRow(width: number, colors: Record<"teal" | "peach" | "yellow", Color>): string[] {
 	if (width < 4) return [];
 
 	const segments: Segment[] = [];
-	const cache = cacheLabel(readCacheStatus());
-	if (cache) segments.push({ label: cache, color: peach });
-	segments.push({ label: rateLabel(streaming, currentRate()), color: teal });
+	const model = currentCtx?.model;
+	const modelKey = model ? `${model.provider}/${model.id}` : undefined;
+
+	if (modelKey) {
+		const stats = readStats();
+		const today = localDay();
+		const session = usableCounters(
+			sessionHash ? stats?.sessions?.[sessionHash]?.[modelKey] : undefined,
+			today,
+		);
+		const total = usableCounters(stats?.totalsByModel?.[modelKey], today);
+		if (session) {
+			const warned = readCacheStatus()?.includes("⚠️") ?? false;
+			segments.push({ label: sessionLabel(session, warned), color: colors.peach });
+		}
+		if (total) segments.push({ label: dayLabel(total), color: colors.yellow });
+	}
+
+	segments.push({ label: rateLabel(streaming, currentRate()), color: colors.teal });
 
 	return buildSegments(width, segments);
 }
@@ -132,17 +213,19 @@ function renderRow(width: number, teal: Color, peach: Color): string[] {
 export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		currentCtx = ctx;
+		const sessionId = ctx.sessionManager.getSessionId();
+		sessionHash = sessionId
+			? createHash("sha256").update(sessionId).digest("hex").slice(0, 16)
+			: undefined;
 		stopStreaming();
 		ctx.ui.setWidget(
 			WIDGET_KEY,
 			(tui) => {
 				currentTui = tui;
-				let teal: Color | undefined;
-				let peach: Color | undefined;
+				let colors: Record<"teal" | "peach" | "yellow", Color> | undefined;
 				return {
 					invalidate() {
-						teal = undefined;
-						peach = undefined;
+						colors = undefined;
 					},
 					dispose() {
 						stopStreaming();
@@ -150,9 +233,14 @@ export default function (pi: ExtensionAPI) {
 					render(width: number): string[] {
 						if (!currentCtx) return [];
 						const theme = currentCtx.ui.theme;
-						if (!teal) teal = themeColor(theme, "teal");
-						if (!peach) peach = themeColor(theme, "peach");
-						return renderRow(width, teal, peach);
+						if (!colors) {
+							colors = {
+								teal: themeColor(theme, "teal"),
+								peach: themeColor(theme, "peach"),
+								yellow: themeColor(theme, "yellow"),
+							};
+						}
+						return renderRow(width, colors);
 					},
 				};
 			},
@@ -180,9 +268,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("message_end", () => {
 		stopStreaming();
-		// pi-cache-optimizer writes its status asynchronously after this event,
-		// so one extra render picks up the new numbers instead of the stale ones.
-		setTimeout(() => currentTui?.requestRender(), STATUS_SETTLE_MS).unref?.();
+		setTimeout(() => currentTui?.requestRender(), STATS_SETTLE_MS).unref?.();
 	});
 
 	pi.on("agent_end", () => stopStreaming());
