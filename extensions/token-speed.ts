@@ -28,6 +28,10 @@ function formatRate(rate: number): string {
 	return rate >= 10 ? String(Math.round(rate)) : rate.toFixed(1);
 }
 
+export function rateLabel(isStreaming: boolean, rate: number): string {
+	return ` ${isStreaming ? formatRate(rate) : "0"} tok/s `;
+}
+
 function hexToFgAnsi(hex: string): string {
 	const r = parseInt(hex.slice(1, 3), 16);
 	const g = parseInt(hex.slice(3, 5), 16);
@@ -110,7 +114,7 @@ function renderRow(width: number, teal: string, peach: string): string[] {
 	const segments: Segment[] = [];
 	const cache = cacheLabel(readCacheStatus());
 	if (cache) segments.push({ label: cache, fg: peach });
-	if (streaming) segments.push({ label: ` ${formatRate(currentRate())} tok/s `, fg: teal });
+	segments.push({ label: rateLabel(streaming, currentRate()), fg: teal });
 
 	return buildSegments(width, segments);
 }
