@@ -52,6 +52,33 @@ Do not restate the line below. Do not explain how a tool or pattern works. Do
 not write tutorial notes for a hypothetical reader. A stale comment is worse
 than no comment, so delete rather than let it rot.
 
+The rule can be in context and still get violated by prose that does not
+restate the code: justifying a design choice, reciting provenance and
+measurements, or spelling out residual risk. All three belong in the pull
+request description or a doc, not the file.
+
+Before, an essay justifying the design:
+
+```hcl
+# This account differs from pr-plan-sa in the one way that matters: it can spend
+# money. roles/aiplatform.user lets it call Vertex. So the argument that makes
+# pr-plan-sa's repository-wide binding acceptable, that its safety comes entirely
+# from holding no write permission, does not transfer here, and this binding is
+# narrowed to the single workflow file allowed to mint it.
+#
+# Never grant a write role. Never grant roles/secretmanager.secretAccessor.
+# Never grant roles/logging.logWriter: the agent records its own token usage in
+# verdict.json, and a write capability is not needed for that.
+resource "google_service_account" "pr_review" {
+```
+
+After, the one constraint that survives:
+
+```hcl
+# Must never hold a write role, secretmanager.secretAccessor, or logging.logWriter.
+resource "google_service_account" "pr_review" {
+```
+
 ## Load this before you act
 
 - Editing anything under `~/.pi/agent/` or `~/.agents/skills/`? Read
