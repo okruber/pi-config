@@ -1,0 +1,549 @@
+diff --git a/README.md b/README.md
+index f37a2e5..ee41b0a 100644
+--- a/README.md
++++ b/README.md
+@@ -1,94 +1,111 @@
+-# @juicesharp/rpiv-ask-user-question
++# ask-user-question (fork)
+ 
+-[![npm version](https://img.shields.io/npm/v/@juicesharp/rpiv-ask-user-question.svg)](https://www.npmjs.com/package/@juicesharp/rpiv-ask-user-question)
+-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
++The `ask_user_question` tool: a tabbed terminal questionnaire the model opens
++instead of guessing when a request is ambiguous.
+ 
+-<div align="center">
+-  <a href="https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question">
+-    <img src="https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/cover.png" alt="rpiv-ask-user-question cover: a tabbed terminal questionnaire asking Which real development task are we planning right now?, with numbered options — Bug fix, New feature, Refactor — each under a one-line description, and a footer of key hints" width="50%">
+-  </a>
+-</div>
++This is a vendored fork of
++[`@juicesharp/rpiv-ask-user-question`](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question)
++2.6.2 (MIT). Everything in `docs/` is upstream's reference material and still
++applies, except where this file says otherwise.
+ 
+-Let the model ask you instead of guessing. This extension gives [Pi Agent](https://github.com/badlogic/pi-mono) one tool — `ask_user_question` — that opens a terminal dialog of up to four questions with written-out options, and hands your choices back as structured data. Install it if you would rather spend fifteen seconds picking than an hour undoing a wrong assumption.
++## Why the fork exists
+ 
+-## Install
++Upstream mounts the dialog as a pi-tui overlay anchored to the bottom of the
++terminal at `maxHeight: "100%"`. pi-tui composites overlay lines over the
++viewport, so the dialog paints across the last rows of the transcript. The
++message that prompted the questions is exactly what ends up hidden, and you
++can't read it while you answer.
+ 
+-```sh
+-pi install npm:@juicesharp/rpiv-ask-user-question
+-```
+-
+-Restart your Pi session.
+-
+-## Quick start
+-
+-Nothing to set up — the tool is live as soon as Pi restarts. Hand the model a task with a real decision buried in it:
+-
+-> Add caching to the API client.
+-
+-Rather than picking a strategy on your behalf, the model calls `ask_user_question` and a dialog takes over the bottom of your terminal. Move with `↑`/`↓`, choose with `Enter`, press `n` to attach a note, or land on the `Type something.` row to answer in your own words. While typing, `Shift+Enter` adds a line, `Ctrl+G` opens Pi's configured external editor, and `Ctrl+U` clears the draft; browsing another option and returning keeps what you wrote. `Esc` abandons the questionnaire entirely.
+-
+-When the questionnaire begins waiting in an interactive TTY, it emits one standard terminal BEL (`\x07`). Your terminal configuration determines whether that appears as an audible alert, a visual alert, or nothing; redirected and non-TTY output is untouched.
+-
+-![Single question in the dialog: the tab strip reads Feature Type, Design Tab, Testing, Release, Submit; the question Which real development task are we planning right now? sits above four numbered options — Bug fix (Recommended), New feature, Refactor, Perf tuning — each with a one-line description, followed by the appended Type something. row](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/single-question.jpg)
+-
+-When the model asks several things at once, `Tab` moves between them and a Submit tab reviews everything before it goes back:
+-
+-![Submit tab of a four-question dialog: a Review your answers list showing Feature Type set to Bug fix and Testing set to Unit tests plus Integration tests, a warning naming Design Tab and Release as still unanswered, and a picker offering Submit answers or Cancel](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/submit-tab.jpg)
++That's [juicesharp/rpiv-mono#47](https://github.com/juicesharp/rpiv-mono/issues/47),
++open since May 2026. The maintainer's answer is `Ctrl+]`, which collapses the
++overlay so you can read the transcript, then brings the dialog back. He has
++said he intends to keep the overlay. Several people in that thread patch it out
++locally instead; one forked.
+ 
+-## What you get
++## What this fork changes
+ 
+-- **Typed options instead of a wall of prose** — each question carries 2-4 authored choices, and every choice comes with a description of what it means or what it costs you.
+-- **You can always answer in your own words** — a `Type something.` row is appended to every question, single- or multi-select, widens to the full pane while you type, keeps its multiline draft visible in that row while you browse, and supports Pi's `Shift+Enter` newline and `Ctrl+G` external-editor flows.
+-- **Compare real artifacts, not just labels** — an option can carry a markdown `preview` (ASCII mockup, code, diagram, config) that renders in a bordered box beside the option list.
+-- **One interruption, not five** — up to four questions arrive in a single tabbed dialog, and the Submit tab lists your answers and names anything still blank before you commit.
+-- **Notes on any answer** — `n` opens a multiline note editor on any question tab; the note travels back to the model alongside the choice without marking the question answered.
+-- **Read the transcript behind the dialog** — `Ctrl+]` collapses the overlay so you can scroll the conversation, then brings it back with your answers intact.
+-- **Works outside the terminal too** — in RPC and ACP hosts such as the VS Code pendant or Zed the questionnaire walks through the host's native dialogs, and in non-interactive runs the tool is removed from the model's tool list instead of failing every call.
++The main deviation, in `ask-user-question.ts`:
+ 
+-## Configuration
+-
+-Optional. Settings live in `~/.config/rpiv-ask-user-question/config.json`; the file is read, never written.
+-
+-| Setting | What it does | Default |
+-| --- | --- | --- |
+-| `collapseKey` | Key that collapses and expands the dialog. Accepts Pi keybinding ids such as `alt+o`; `"off"` disables the shortcut. | `"ctrl+]"` |
+-| `guidance.description` | Full replacement for the tool description the model sees. A non-empty string replaces the built-in text entirely — no merging. | built-in description |
+-| `guidance.promptSnippet` | One-line description of the tool in the system prompt — tune how eagerly the model asks. | built-in snippet |
+-| `guidance.promptGuidelines` | Usage guidelines given to the model, as a list of strings. | 4 built-in guidelines |
+-
+-```json
+-{ "collapseKey": "alt+o" }
++```diff
++-  overlay: true,
++-  overlayOptions: { anchor: "bottom-center", width: "100%", maxHeight: "100%", ... },
++-  onHandle: (handle) => { ... },
+++  overlay: false,
+ ```
+ 
+-Malformed JSON falls back to the defaults with a warning; an individual unusable value is silently dropped back to its default. Never an error.
+-
+-## Reference
+-
+-- [Tool schema](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/docs/tool-schema.md) — parameters, limits, reserved labels, validation errors, the result envelope, and the `rpiv:ask-user:prompt` event.
+-- [Keyboard and layout](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/docs/keyboard.md) — every key, the rows the dialog appends, notes, collapse mode, and how previews and overflow adapt to terminal size.
+-- [Configuration](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/docs/configuration.md) — file lookup and `XDG_CONFIG_HOME`, the `collapseKey` grammar, the `guidance.*` prompt overrides, and how invalid values are handled.
+-- [Hosts and runtime behavior](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/docs/hosts.md) — terminal vs RPC vs non-interactive, what degrades in each, and the load-failure envelopes.
+-- [Localization](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/docs/localization.md) — the nine shipped languages, how the locale is chosen, and how to add one.
+-
+-## Requirements
+-
+-- Node.js 22 or newer.
+-- Pi Agent, with an interactive terminal or an RPC/ACP host. Non-interactive runs never see the tool.
+-- A terminal at least 100 columns wide for side-by-side previews; narrower terminals stack the preview under the options.
+-
+-No native dependencies, no compiler, no API keys — the extension makes no model calls of its own.
++With `overlay: false`, pi puts the component in the editor slot instead
++(`showExtensionCustom` in pi's interactive mode). The dialog joins the normal
++chat flow: the transcript is pushed up rather than painted over, nothing is
++hidden, and the conversation stays in terminal scrollback while you answer.
++
++Three consequences follow.
++
++- The dialog no longer floats above other overlays. It shares the editor slot,
++  which is where pi's own dialogs live.
++- `onHandle` never fires, so upstream's raw-terminal collapse listener could
++  never act. It's deleted here, along with the overlay handle it read. `Ctrl+]`
++  still collapses and expands, because a focused inline component receives
++  keystrokes directly through `handleInput`. Collapsing is now a convenience,
++  not the only way to read what the model said.
++- Inline height is height taken from the transcript, so
++  `state/build-questionnaire.ts` caps the dialog at 70% of the terminal, with a
++  floor of 8 rows and never more than the terminal itself. Past that the body
++  scrolls behind the sticky heading and footer, which upstream's `DialogView`
++  already knows how to do.
++
++One packaging change: `@juicesharp/rpiv-config` is vendored down to the four
++symbols this extension uses (`vendor/rpiv-config.ts`), so the fork has no
++`node_modules` and can live in this repo as a plain extension directory.
++
++## Config
++
++Unchanged from upstream, including the file location:
++`~/.config/rpiv-ask-user-question/config.json`. See
++[docs/configuration.md](docs/configuration.md). The `collapseKey` setting still
++works.
++
++## Updating from upstream
++
++Check [#47](https://github.com/juicesharp/rpiv-mono/issues/47) first. If the
++overlay became optional upstream, drop this fork and go back to the npm package.
++
++`fork.patch` is every change this fork makes, taken against pristine 2.6.2, so
++the update is copy-then-apply:
++
++```bash
++cd /tmp && npm pack @juicesharp/rpiv-ask-user-question@<version>
++tar xzf juicesharp-rpiv-ask-user-question-<version>.tgz
++
++EXT=~/Documents/Personal/pi-config/extensions/ask-user-question
++cp "$EXT/fork.patch" /tmp/fork.patch
++cp -R package/. "$EXT"/
++cd "$EXT" && git apply -p1 /tmp/fork.patch
++```
+ 
+-## Troubleshooting
++If a hunk fails, upstream moved that code. Apply what's left with
++`git apply -p1 --reject`, fix the `.rej` files by hand, then regenerate the
++patch so the next update starts from a clean base:
+ 
+-**The model says the questionnaire UI failed to load and asks its questions as chat text.** The dialog's modules were replaced on disk while Pi was running, usually by a package-manager install touching the store. Repair the install if it is broken, then restart Pi; the failure is not recoverable inside the running process.
++```bash
++cd /tmp && rm -rf rev && mkdir rev
++cp -R /tmp/package rev/a && cp -R "$EXT" rev/b && rm -f rev/b/fork.patch
++cd rev && git diff --no-index --no-prefix a b > "$EXT/fork.patch"
++```
+ 
+-**`Ctrl+]` does nothing.** On keyboard layouts where `]` sits on the shifted layer (Latin American among them) the default is unreachable. Set `collapseKey` to something you can type, for example `"alt+o"`.
++Regenerate it the same way after any edit to the fork, or it goes stale.
+ 
+-## Related
++After updating, smoke-test without starting pi. Copy the extension to a scratch
++directory next to a `node_modules` holding symlinks to pi's own
++`@earendil-works/*` and `typebox`, then import the module graph with jiti and
++render a questionnaire headlessly against a stub theme and a fake `tui`
++(`{ terminal: { rows, columns } }`). That catches broken imports and layout
++crashes in seconds, including the short-terminal cases.
+ 
+-- [`@juicesharp/rpiv-i18n`](https://www.npmjs.com/package/@juicesharp/rpiv-i18n) — optional; installing it renders the dialog chrome in your language and adds `/languages`.
+-- [`@juicesharp/rpiv-pi`](https://www.npmjs.com/package/@juicesharp/rpiv-pi) — the umbrella package whose workflow skills use `ask_user_question` as their developer checkpoint. `/rpiv-setup` offers to install this extension.
++## Installation
+ 
+-## License
++The extension loads from this directory automatically, because
++`~/.pi/agent/extensions` is a symlink to `extensions/` in this repo and pi
++discovers any subdirectory with a `pi.extensions` manifest.
+ 
+-MIT — see [LICENSE](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/LICENSE).
++Don't install the npm package alongside it. Two copies register the same tool
++name and pi keeps only one of them.
+diff --git a/ask-user-question.ts b/ask-user-question.ts
+index ce11e7e..c6d962a 100644
+--- a/ask-user-question.ts
++++ b/ask-user-question.ts
+@@ -1,5 +1,4 @@
+ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+-import { isKeyRelease, isKeyRepeat, matchesKey } from "@earendil-works/pi-tui";
+ import { loadConfig, resolveCollapseKey, validateGuidanceFields } from "./config.js";
+ import {
+ 	ASK_USER_BLOCKED_EVENT,
+@@ -215,42 +214,10 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
+ 			// sentinel value `"off"` to disable the shortcut entirely.
+ 			const collapseKey = resolveCollapseKey(loadConfig());
+ 
+-			// Capture the overlay handle so the session can call `setHidden()` when the
+-			// user toggles collapse, and register a raw terminal input listener for the
+-			// same key so the toggle still works while the overlay is hidden (pi-tui does
+-			// not route input to a hidden overlay's `component.handleInput`).
+-			const sessionRef: {
+-				current: import("./state/questionnaire-session.js").QuestionnaireSession | null;
+-			} = { current: null };
+-			const overlayHandleRef: { current: import("@earendil-works/pi-tui").OverlayHandle | undefined } = {
+-				current: undefined,
+-			};
+-			let hasAnnouncedHide = false;
+-			let removeOverlayInputListener: (() => void) | undefined;
+-
+-			if (collapseKey !== "off" && typeof ctx.ui.onTerminalInput === "function") {
+-				removeOverlayInputListener = ctx.ui.onTerminalInput((data) => {
+-					const handle = overlayHandleRef.current;
+-					if (!handle) return undefined;
+-					// Only act while the questionnaire is hidden (its handleInput is
+-					// unreachable) or actually focused. When some other overlay is on
+-					// top (e.g. `/btw`), leave the keystroke to that overlay instead of
+-					// toggling the questionnaire from underneath it.
+-					if (!handle.isHidden() && !handle.isFocused()) return undefined;
+-					if (!matchesKey(data, collapseKey as Parameters<typeof matchesKey>[1])) return undefined;
+-					// Kitty-protocol terminals report press, repeat, and release separately.
+-					// Toggle only on the initial press so a tap does not immediately reopen
+-					// the overlay and a held key does not toggle it repeatedly.
+-					if (isKeyRelease(data) || isKeyRepeat(data)) return { consume: true };
+-					sessionRef.current?.toggleCollapsedExternal();
+-					if (handle.isHidden() && !hasAnnouncedHide) {
+-						hasAnnouncedHide = true;
+-						ctx.ui.notify?.(`ask_user_question hidden — press ${collapseKey} to reopen`, "info");
+-					}
+-					return { consume: true };
+-				});
+-			}
+-
++			// FORK: upstream also registers a raw terminal listener for `collapseKey`,
++			// because pi-tui routes no input to a hidden overlay. Inline mode keeps the
++			// component focused whether it is collapsed or not, so the key arrives through
++			// `handleInput` and the listener is gone.
+ 			emitAskUserBlockedEvent(pi, true);
+ 			try {
+ 				emitTerminalAttention();
+@@ -282,21 +249,16 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
+ 							},
+ 							collapseKey,
+ 						});
+-						sessionRef.current = session;
+ 						return session.component;
+ 					},
+ 					{
+-						overlay: true,
+-						overlayOptions: {
+-							anchor: "bottom-center",
+-							width: "100%",
+-							maxHeight: "100%",
+-							margin: { left: 0, right: 0, bottom: 0 },
+-						},
+-						onHandle: (handle) => {
+-							overlayHandleRef.current = handle;
+-							sessionRef.current?.setOverlayHandle(handle);
+-						},
++						// FORK: upstream mounts this as a bottom-anchored overlay, which paints
++						// over the transcript rows behind it (juicesharp/rpiv-mono#47). Inline
++						// mode puts the dialog in the editor slot instead, so the message that
++						// prompted the questions is pushed up and stays readable and scrollable.
++						// `onHandle` never fires without an overlay; the collapse key still works
++						// because a focused inline component receives keystrokes directly.
++						overlay: false,
+ 					},
+ 				);
+ 
+@@ -315,7 +277,6 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
+ 
+ 				return buildQuestionnaireResponse(result, typed);
+ 			} finally {
+-				removeOverlayInputListener?.();
+ 				emitAskUserBlockedEvent(pi, false);
+ 			}
+ 		},
+diff --git a/config.ts b/config.ts
+index cc8668e..2aa7db6 100644
+--- a/config.ts
++++ b/config.ts
+@@ -1,5 +1,5 @@
+-import type { GuidanceFields } from "@juicesharp/rpiv-config";
+-import { loadJsonConfigWithLegacyFallback, validateGuidanceFields } from "@juicesharp/rpiv-config";
++import type { GuidanceFields } from "./vendor/rpiv-config.js";
++import { loadJsonConfigWithLegacyFallback, validateGuidanceFields } from "./vendor/rpiv-config.js";
+ 
+ /** Key spec for the overlay collapse/expand shortcut, e.g. `"ctrl+]"` or `"alt+o"`. */
+ export type CollapseKeySpec = string;
+diff --git a/docs/keyboard.md b/docs/keyboard.md
+index b0eb9d2..c3c501d 100644
+--- a/docs/keyboard.md
++++ b/docs/keyboard.md
+@@ -67,6 +67,11 @@ keystrokes edit the buffer, so `n` types an `n`. Pasted line breaks are preserve
+ 
+ ## Collapse mode
+ 
++> Fork note: this fork renders the dialog inline instead of as an overlay, so the
++> transcript is never covered and the overlay-stack details below don't apply.
++> `Ctrl+]` still shrinks the dialog to one row and brings it back, routed through the
++> focused component rather than the raw terminal listener. See the README.
++
+ `Ctrl+]` gets the dialog out of the way: the overlay is marked hidden in Pi's overlay
+ stack and shrinks to a single dim hint row, so the transcript it was covering becomes
+ readable and chat scrolling resumes. Press the same key to bring the questionnaire back
+diff --git a/package.json b/package.json
+index 1be7a2e..4dc475e 100644
+--- a/package.json
++++ b/package.json
+@@ -1,100 +1,16 @@
+ {
+-	"name": "@juicesharp/rpiv-ask-user-question",
+-	"version": "2.6.2",
+-	"description": "Pi extension. A structured questionnaire the model can put to you when it would otherwise guess, with typed options instead of free-form replies.",
+-	"keywords": [
+-		"pi-package",
+-		"pi-extension",
+-		"rpiv"
+-	],
++	"name": "oek-ask-user-question",
++	"version": "2.6.2-fork.1",
++	"private": true,
++	"description": "Fork of @juicesharp/rpiv-ask-user-question that renders the questionnaire inline instead of as an overlay, so it never covers the transcript.",
+ 	"type": "module",
+-	"exports": {
+-		".": "./index.ts",
+-		"./events": "./events.ts"
+-	},
+ 	"license": "MIT",
+-	"author": "juicesharp",
+-	"repository": {
+-		"type": "git",
+-		"url": "git+https://github.com/juicesharp/rpiv-mono.git",
+-		"directory": "packages/rpiv-ask-user-question"
+-	},
+-	"homepage": "https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question#readme",
+-	"bugs": {
+-		"url": "https://github.com/juicesharp/rpiv-mono/issues"
+-	},
+-	"publishConfig": {
+-		"access": "public"
+-	},
+-	"scripts": {
+-		"test": "vitest run"
+-	},
+-	"files": [
+-		"ask-user-question.ts",
+-		"rpc-fallback.ts",
+-		"config.ts",
+-		"events.ts",
+-		"index.ts",
+-		"reconcile.ts",
+-		"LICENSE",
+-		"locales/",
+-		"docs/",
+-		"!docs/*.png",
+-		"!docs/*.jpg",
+-		"!docs/*.svg",
+-		"README.md",
+-		"state/build-questionnaire.ts",
+-		"state/external-editor.ts",
+-		"state/i18n-bridge.ts",
+-		"state/key-router.ts",
+-		"state/questionnaire-session.ts",
+-		"state/row-intent.ts",
+-		"state/selectors/contract.ts",
+-		"state/selectors/derivations.ts",
+-		"state/selectors/focus.ts",
+-		"state/selectors/projections.ts",
+-		"state/state-reducer.ts",
+-		"state/state.ts",
+-		"tool/format-answer.ts",
+-		"tool/response-envelope.ts",
+-		"tool/types.ts",
+-		"tool/validate-questionnaire.ts",
+-		"view/component-binding.ts",
+-		"view/components/inline-input.ts",
+-		"view/components/multi-select-view.ts",
+-		"view/components/option-list-view.ts",
+-		"view/components/preview/markdown-content-cache.ts",
+-		"view/components/preview/preview-block-renderer.ts",
+-		"view/components/preview/preview-box-renderer.ts",
+-		"view/components/preview/preview-layout-decider.ts",
+-		"view/components/preview/preview-pane.ts",
+-		"view/components/submit-picker.ts",
+-		"view/components/tab-bar.ts",
+-		"view/components/wrapping-select.ts",
+-		"view/dialog-builder.ts",
+-		"view/props-adapter.ts",
+-		"view/stateful-view.ts",
+-		"view/tab-components.ts",
+-		"view/tab-content-strategy.ts"
+-	],
+ 	"pi": {
+-		"image": "https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/cover.png",
+-		"extensions": [
+-			"./index.ts"
+-		]
++		"extensions": ["./index.ts"]
+ 	},
+ 	"peerDependencies": {
+-		"@juicesharp/rpiv-i18n": "*",
+ 		"@earendil-works/pi-coding-agent": "*",
+-		"@earendil-works/pi-tui": "*"
+-	},
+-	"peerDependenciesMeta": {
+-		"@juicesharp/rpiv-i18n": {
+-			"optional": true
+-		}
+-	},
+-	"dependencies": {
+-		"@juicesharp/rpiv-config": "^2.6.2",
+-		"typebox": "^1.1.24"
++		"@earendil-works/pi-tui": "*",
++		"typebox": "*"
+ 	}
+ }
+diff --git a/state/build-questionnaire.ts b/state/build-questionnaire.ts
+index 936f6a6..2679708 100644
+--- a/state/build-questionnaire.ts
++++ b/state/build-questionnaire.ts
+@@ -32,6 +32,11 @@ import {
+ } from "./selectors/projections.js";
+ import type { QuestionnaireState } from "./state.js";
+ 
++/** FORK: share of the terminal the inline dialog may take before it scrolls its own body. */
++const MAX_DIALOG_HEIGHT_RATIO = 0.7;
++/** FORK: floor for the ratio above, so a very short terminal still gets the chrome. */
++const MIN_DIALOG_ROWS = 8;
++
+ export interface QuestionnaireBuildConfig {
+ 	tui: TUI;
+ 	theme: Theme;
+@@ -115,7 +120,14 @@ class QuestionnaireBuilder {
+ 	private readonly notesInput: Editor;
+ 	private readonly inlineInput: Editor;
+ 	private readonly getTerminalWidth = () => this.tui.terminal.columns;
+-	private readonly getTerminalRows = () => this.tui.terminal.rows;
++	// FORK: the dialog renders inline, so its height budget is what it takes from the
++	// transcript. Capping it below the terminal height keeps the message that prompted
++	// the questions on screen; DialogView scrolls its own body past that point. The
++	// floor covers the chrome (border, spacer, footer) on very short terminals.
++	private readonly getTerminalRows = () => {
++		const rows = this.tui.terminal.rows;
++		return Math.min(rows, Math.max(MIN_DIALOG_ROWS, Math.floor(rows * MAX_DIALOG_HEIGHT_RATIO)));
++	};
+ 
+ 	constructor(config: QuestionnaireBuildConfig) {
+ 		this.tui = config.tui;
+diff --git b/vendor/rpiv-config.ts b/vendor/rpiv-config.ts
+new file mode 100644
+index 0000000..8ca6a54
+--- /dev/null
++++ b/vendor/rpiv-config.ts
+@@ -0,0 +1,84 @@
++/**
++ * Vendored subset of `@juicesharp/rpiv-config` (MIT, https://github.com/juicesharp/rpiv-mono).
++ *
++ * Only the four symbols this extension uses are copied, verbatim apart from the
++ * dropped TypeBox schema export. Vendoring keeps the fork dependency-free so it
++ * can live in the pi-config repo with no node_modules.
++ */
++
++import { existsSync, readFileSync } from "node:fs";
++import { homedir } from "node:os";
++import { isAbsolute, join } from "node:path";
++
++function expandTilde(p: string): string {
++	if (p === "~") return homedir();
++	if (p.startsWith("~/")) return join(homedir(), p.slice(2));
++	return p;
++}
++
++function defaultConfigDir(): string {
++	return join(homedir(), ".config");
++}
++
++function readEnvVar(key: string, fallback?: string): string | undefined {
++	return process.env[key]?.trim() || fallback;
++}
++
++function resolveConfigDir(): string {
++	const xdg = readEnvVar("XDG_CONFIG_HOME");
++	if (!xdg) return defaultConfigDir();
++	const expanded = expandTilde(xdg);
++	return isAbsolute(expanded) ? expanded : defaultConfigDir();
++}
++
++function legacyConfigPath(name: string, file = "config.json"): string {
++	return join(defaultConfigDir(), name, file);
++}
++
++export function configPath(name: string, file = "config.json"): string {
++	return join(resolveConfigDir(), name, file);
++}
++
++export function loadJsonConfig<T>(path: string): T {
++	if (!existsSync(path)) return {} as T;
++	try {
++		const parsed = JSON.parse(readFileSync(path, "utf-8")) as unknown;
++		if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {} as T;
++		return parsed as T;
++	} catch (err) {
++		console.warn(`rpiv-config: invalid JSON at ${path}, using default ({}) — ${(err as Error).message}`);
++		return {} as T;
++	}
++}
++
++export function loadJsonConfigWithLegacyFallback<T>(name: string, file = "config.json"): T {
++	const xdgPath = configPath(name, file);
++	if (existsSync(xdgPath)) return loadJsonConfig<T>(xdgPath);
++	return loadJsonConfig<T>(legacyConfigPath(name, file));
++}
++
++export interface GuidanceFields {
++	promptSnippet?: string;
++	promptGuidelines?: string[];
++	description?: string;
++}
++
++export function validateGuidanceFields(fields: unknown): GuidanceFields {
++	if (!fields || typeof fields !== "object") return {};
++	const g = fields as Record<string, unknown>;
++	const result: GuidanceFields = {};
++	if (typeof g.promptSnippet === "string" && g.promptSnippet.length > 0) {
++		result.promptSnippet = g.promptSnippet;
++	}
++	if (
++		Array.isArray(g.promptGuidelines) &&
++		g.promptGuidelines.length > 0 &&
++		g.promptGuidelines.every((s) => typeof s === "string" && s.length > 0)
++	) {
++		result.promptGuidelines = g.promptGuidelines;
++	}
++	if (typeof g.description === "string" && g.description.length > 0) {
++		result.description = g.description;
++	}
++	return result;
++}

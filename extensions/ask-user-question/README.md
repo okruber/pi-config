@@ -24,7 +24,7 @@ locally instead; one forked.
 
 ## What this fork changes
 
-One deviation, in `ask-user-question.ts`:
+The main deviation, in `ask-user-question.ts`:
 
 ```diff
 -  overlay: true,
@@ -38,19 +38,24 @@ With `overlay: false`, pi puts the component in the editor slot instead
 chat flow: the transcript is pushed up rather than painted over, nothing is
 hidden, and the conversation stays in terminal scrollback while you answer.
 
-Two knock-on effects, both harmless:
+Three consequences follow.
 
-- `onHandle` never fires, so the raw-terminal collapse listener finds no overlay
-  handle and does nothing. `Ctrl+]` still collapses and expands the dialog,
-  because a focused inline component receives keystrokes directly through
-  `handleInput`. Collapsing is now a convenience, not the only way to read what
-  the model said.
 - The dialog no longer floats above other overlays. It shares the editor slot,
   which is where pi's own dialogs live.
+- `onHandle` never fires, so upstream's raw-terminal collapse listener could
+  never act. It's deleted here, along with the overlay handle it read. `Ctrl+]`
+  still collapses and expands, because a focused inline component receives
+  keystrokes directly through `handleInput`. Collapsing is now a convenience,
+  not the only way to read what the model said.
+- Inline height is height taken from the transcript, so
+  `state/build-questionnaire.ts` caps the dialog at 70% of the terminal, with a
+  floor of 8 rows and never more than the terminal itself. Past that the body
+  scrolls behind the sticky heading and footer, which upstream's `DialogView`
+  already knows how to do.
 
-The second change is packaging: `@juicesharp/rpiv-config` is vendored down to
-the four symbols this extension uses (`vendor/rpiv-config.ts`), so the fork has
-no `node_modules` and can live in this repo as a plain extension directory.
+One packaging change: `@juicesharp/rpiv-config` is vendored down to the four
+symbols this extension uses (`vendor/rpiv-config.ts`), so the fork has no
+`node_modules` and can live in this repo as a plain extension directory.
 
 ## Config
 
@@ -61,20 +66,40 @@ works.
 
 ## Updating from upstream
 
+Check [#47](https://github.com/juicesharp/rpiv-mono/issues/47) first. If the
+overlay became optional upstream, drop this fork and go back to the npm package.
+
+`fork.patch` is every change this fork makes, taken against pristine 2.6.2, so
+the update is copy-then-apply:
+
 ```bash
 cd /tmp && npm pack @juicesharp/rpiv-ask-user-question@<version>
 tar xzf juicesharp-rpiv-ask-user-question-<version>.tgz
-cp -R package/. ~/Documents/Personal/pi-config/extensions/ask-user-question/
+
+EXT=~/Documents/Personal/pi-config/extensions/ask-user-question
+cp "$EXT/fork.patch" /tmp/fork.patch
+cp -R package/. "$EXT"/
+cd "$EXT" && git apply -p1 /tmp/fork.patch
 ```
 
-Then reapply the fork, which `git diff` will show you as three reverted hunks:
+If a hunk fails, upstream moved that code. Apply what's left with
+`git apply -p1 --reject`, fix the `.rej` files by hand, then regenerate the
+patch so the next update starts from a clean base:
 
-1. `overlay: false` in the `ctx.ui.custom` options in `ask-user-question.ts`.
-2. The `./vendor/rpiv-config.js` imports in `config.ts`.
-3. This `package.json` and `README.md`.
+```bash
+cd /tmp && rm -rf rev && mkdir rev
+cp -R /tmp/package rev/a && cp -R "$EXT" rev/b && rm -f rev/b/fork.patch
+cd rev && git diff --no-index --no-prefix a b > "$EXT/fork.patch"
+```
 
-Check whether upstream has closed #47 first. If the overlay becomes optional
-there, drop this fork and go back to the npm package.
+Regenerate it the same way after any edit to the fork, or it goes stale.
+
+After updating, smoke-test without starting pi. Copy the extension to a scratch
+directory next to a `node_modules` holding symlinks to pi's own
+`@earendil-works/*` and `typebox`, then import the module graph with jiti and
+render a questionnaire headlessly against a stub theme and a fake `tui`
+(`{ terminal: { rows, columns } }`). That catches broken imports and layout
+crashes in seconds, including the short-terminal cases.
 
 ## Installation
 

@@ -32,6 +32,11 @@ import {
 } from "./selectors/projections.js";
 import type { QuestionnaireState } from "./state.js";
 
+/** FORK: share of the terminal the inline dialog may take before it scrolls its own body. */
+const MAX_DIALOG_HEIGHT_RATIO = 0.7;
+/** FORK: floor for the ratio above, so a very short terminal still gets the chrome. */
+const MIN_DIALOG_ROWS = 8;
+
 export interface QuestionnaireBuildConfig {
 	tui: TUI;
 	theme: Theme;
@@ -115,7 +120,14 @@ class QuestionnaireBuilder {
 	private readonly notesInput: Editor;
 	private readonly inlineInput: Editor;
 	private readonly getTerminalWidth = () => this.tui.terminal.columns;
-	private readonly getTerminalRows = () => this.tui.terminal.rows;
+	// FORK: the dialog renders inline, so its height budget is what it takes from the
+	// transcript. Capping it below the terminal height keeps the message that prompted
+	// the questions on screen; DialogView scrolls its own body past that point. The
+	// floor covers the chrome (border, spacer, footer) on very short terminals.
+	private readonly getTerminalRows = () => {
+		const rows = this.tui.terminal.rows;
+		return Math.min(rows, Math.max(MIN_DIALOG_ROWS, Math.floor(rows * MAX_DIALOG_HEIGHT_RATIO)));
+	};
 
 	constructor(config: QuestionnaireBuildConfig) {
 		this.tui = config.tui;

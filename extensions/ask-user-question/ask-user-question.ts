@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isKeyRelease, isKeyRepeat, matchesKey } from "@earendil-works/pi-tui";
 import { loadConfig, resolveCollapseKey, validateGuidanceFields } from "./config.js";
 import {
 	ASK_USER_BLOCKED_EVENT,
@@ -215,42 +214,10 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 			// sentinel value `"off"` to disable the shortcut entirely.
 			const collapseKey = resolveCollapseKey(loadConfig());
 
-			// Capture the overlay handle so the session can call `setHidden()` when the
-			// user toggles collapse, and register a raw terminal input listener for the
-			// same key so the toggle still works while the overlay is hidden (pi-tui does
-			// not route input to a hidden overlay's `component.handleInput`).
-			const sessionRef: {
-				current: import("./state/questionnaire-session.js").QuestionnaireSession | null;
-			} = { current: null };
-			const overlayHandleRef: { current: import("@earendil-works/pi-tui").OverlayHandle | undefined } = {
-				current: undefined,
-			};
-			let hasAnnouncedHide = false;
-			let removeOverlayInputListener: (() => void) | undefined;
-
-			if (collapseKey !== "off" && typeof ctx.ui.onTerminalInput === "function") {
-				removeOverlayInputListener = ctx.ui.onTerminalInput((data) => {
-					const handle = overlayHandleRef.current;
-					if (!handle) return undefined;
-					// Only act while the questionnaire is hidden (its handleInput is
-					// unreachable) or actually focused. When some other overlay is on
-					// top (e.g. `/btw`), leave the keystroke to that overlay instead of
-					// toggling the questionnaire from underneath it.
-					if (!handle.isHidden() && !handle.isFocused()) return undefined;
-					if (!matchesKey(data, collapseKey as Parameters<typeof matchesKey>[1])) return undefined;
-					// Kitty-protocol terminals report press, repeat, and release separately.
-					// Toggle only on the initial press so a tap does not immediately reopen
-					// the overlay and a held key does not toggle it repeatedly.
-					if (isKeyRelease(data) || isKeyRepeat(data)) return { consume: true };
-					sessionRef.current?.toggleCollapsedExternal();
-					if (handle.isHidden() && !hasAnnouncedHide) {
-						hasAnnouncedHide = true;
-						ctx.ui.notify?.(`ask_user_question hidden — press ${collapseKey} to reopen`, "info");
-					}
-					return { consume: true };
-				});
-			}
-
+			// FORK: upstream also registers a raw terminal listener for `collapseKey`,
+			// because pi-tui routes no input to a hidden overlay. Inline mode keeps the
+			// component focused whether it is collapsed or not, so the key arrives through
+			// `handleInput` and the listener is gone.
 			emitAskUserBlockedEvent(pi, true);
 			try {
 				emitTerminalAttention();
@@ -282,7 +249,6 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 							},
 							collapseKey,
 						});
-						sessionRef.current = session;
 						return session.component;
 					},
 					{
@@ -311,7 +277,6 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
 				return buildQuestionnaireResponse(result, typed);
 			} finally {
-				removeOverlayInputListener?.();
 				emitAskUserBlockedEvent(pi, false);
 			}
 		},
