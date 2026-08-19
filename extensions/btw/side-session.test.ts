@@ -55,3 +55,87 @@ describe("buildSeedMessages", () => {
 		expect(messages).toEqual([{ role: "user", content: [{ type: "text", text: "FRAMING" }] }]);
 	});
 });
+
+import { createSideSession, type SideSessionContext, type SideSessionDeps } from "./side-session.js";
+
+function sessionContext(): SideSessionContext {
+	return {
+		getSystemPrompt: () => SYSTEM_PROMPT,
+		buildContextMessages: () => [],
+		model: { provider: "anthropic", id: "claude-opus-5", api: "anthropic-messages" } as never,
+		modelRegistry: {} as never,
+		thinkingLevel: "off",
+	};
+}
+
+function fakeDeps(): { deps: SideSessionDeps; captured: { options?: Record<string, unknown> } } {
+	const captured: { options?: Record<string, unknown> } = {};
+	const deps: SideSessionDeps = {
+		createSession: (async (options: Record<string, unknown>) => {
+			captured.options = options;
+			return {
+				session: {
+					agent: { state: { messages: [] } },
+					subscribe: () => () => {},
+					abort: async () => {},
+					dispose: () => {},
+				},
+			};
+		}) as never,
+		createInMemorySessionManager: () => ({}) as never,
+	};
+	return { deps, captured };
+}
+
+describe("createSideSession", () => {
+	it("requests exactly the coding-agent tool set", async () => {
+		const { deps, captured } = fakeDeps();
+		await createSideSession(sessionContext(), "FRAMING", deps);
+		expect(captured.options?.tools).toEqual(["read", "bash", "edit", "write"]);
+	});
+
+	it("seeds the sub-session with the framing as the trailing message", async () => {
+		const { deps } = fakeDeps();
+		const runtime = await createSideSession(sessionContext(), "FRAMING", deps);
+		const messages = runtime.session.agent.state.messages as { role: string; content: { text: string }[] }[];
+		expect(messages.at(-1)).toEqual({ role: "user", content: [{ type: "text", text: "FRAMING" }] });
+	});
+
+	it("throws a clear error when no model is active", async () => {
+		const { deps } = fakeDeps();
+		const ctx = { ...sessionContext(), model: null };
+		await expect(createSideSession(ctx, "FRAMING", deps)).rejects.toThrow("No active model");
+	});
+
+	it("dispose aborts the session before disposing it", async () => {
+		const order: string[] = [];
+		const { deps } = fakeDeps();
+		deps.createSession = (async () => ({
+			session: {
+				agent: { state: { messages: [] } },
+				subscribe: () => () => {},
+				abort: async () => {
+					order.push("abort");
+				},
+				dispose: () => {
+					order.push("dispose");
+				},
+			},
+		})) as never;
+
+		const runtime = await createSideSession(sessionContext(), "FRAMING", deps);
+		await runtime.dispose();
+		expect(order).toEqual(["abort", "dispose"]);
+	});
+
+	it("dispose runs every registered unsubscribe", async () => {
+		const { deps } = fakeDeps();
+		const runtime = await createSideSession(sessionContext(), "FRAMING", deps);
+		let unsubscribed = 0;
+		runtime.subscriptions.add(() => {
+			unsubscribed += 1;
+		});
+		await runtime.dispose();
+		expect(unsubscribed).toBe(1);
+	});
+});
