@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.2",
-  "defaultProvider": "llama",
-  "defaultModel": "qwen3.5-35b-a3b",
+  "defaultProvider": "openrouter",
+  "defaultModel": "deepseek/deepseek-v4-flash-0731",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
@@ -19,7 +19,7 @@
     "anthropic/claude-sonnet-5",
     "anthropic/claude-opus-5",
     "openrouter/deepseek/deepseek-v4-flash-0731",
-    "llama/qwen3.5-35b-a3b",
+    "llama/qwen3.6-35b-a3b",
     "lmstudio/qwen3.5-35b-a3b",
     "openai-codex/gpt-5.6-luna"
   ],
