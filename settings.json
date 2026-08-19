@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.2",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-sonnet-5",
+  "defaultModel": "claude-opus-5",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
