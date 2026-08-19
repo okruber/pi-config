@@ -6,3 +6,6 @@ extensions/remnic/remnic.config.json
 
 # superpowers brainstorm scratch (visual companion)
 .superpowers/
+
+# node_modules in extensions
+extensions/**/node_modules/
