@@ -1,0 +1,22 @@
+{
+	"name": "oek-btw",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Side channel for questions and handoffs that never enters main LLM context.",
+	"type": "module",
+	"pi": {
+		"extensions": ["./index.ts"]
+	},
+	"scripts": {
+		"test": "vitest --run"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	},
+	"devDependencies": {
+		"typescript": "^6.0.2",
+		"vitest": "^4.1.0"
+	}
+}
