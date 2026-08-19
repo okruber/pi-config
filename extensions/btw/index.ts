@@ -3,6 +3,7 @@ import { BtwOverlay, matchesFocusShortcut } from "./overlay.js";
 import { createSideSession, nodeSideSessionDeps, type SideSessionRuntime } from "./side-session.js";
 import { BTW_RESET_ENTRY, BTW_TURN_ENTRY, rehydrateThread, type BtwTurn } from "./thread.js";
 import { appendUserEntry, applyTranscriptEvent, emptyTranscript, type TranscriptState } from "./transcript.js";
+import { formatThreadForInjection, summarizeFraming } from "./inject.js";
 
 export function questionFraming(question: string): string {
 	return [
@@ -142,6 +143,45 @@ export default function (pi: ExtensionAPI) {
 			thread = [];
 			transcript = emptyTranscript();
 			status = null;
+			overlay?.close();
+		overlay = null;
+		pi.appendEntry(BTW_RESET_ENTRY, {});
+		},
+	});
+
+	pi.registerCommand("btw:inject", {
+		description: "Send the side thread to the main agent",
+		handler: async (args, ctx) => {
+			if (thread.length === 0 && !args.trim()) {
+				ctx.ui.notify("Side thread is empty.", "warning");
+				return;
+			}
+			pi.sendUserMessage(formatThreadForInjection(thread, args), { deliverAs: "followUp", triggerTurn: true });
+			await runtime?.dispose();
+			runtime = null;
+			thread = [];
+			transcript = emptyTranscript();
+			overlay?.close();
+			overlay = null;
+			pi.appendEntry(BTW_RESET_ENTRY, {});
+		},
+	});
+
+	pi.registerCommand("btw:summarize", {
+		description: "Summarize the side thread into the main agent",
+		handler: async (args, ctx) => {
+			if (thread.length === 0) {
+				ctx.ui.notify("Side thread is empty.", "warning");
+				return;
+			}
+			const active = await ensureSession(ctx, summarizeFraming(thread, args));
+			await active.session.prompt("", { source: "extension" });
+			const summary = transcript.entries.filter((e) => e.role === "assistant").at(-1)?.text ?? "";
+			pi.sendUserMessage(`[Summary of a side thread:]\n\n${summary}`, { deliverAs: "followUp", triggerTurn: true });
+			await runtime?.dispose();
+			runtime = null;
+			thread = [];
+			transcript = emptyTranscript();
 			overlay?.close();
 			overlay = null;
 			pi.appendEntry(BTW_RESET_ENTRY, {});
