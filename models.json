@@ -1,5 +1,32 @@
 {
   "providers": {
+    "llama": {
+      "baseUrl": "http://127.0.0.1:8090/v1",
+      "api": "openai-completions",
+      "apiKey": "llama",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "thinkingFormat": "qwen-chat-template",
+        "chatTemplateKwargs": {
+          "enable_thinking": {
+            "$var": "thinking.enabled",
+            "omitWhenOff": true
+          }
+        }
+      },
+      "models": [
+        {
+          "id": "qwen3.5-35b-a3b",
+          "name": "Qwen 3.5 35B A3B MoE Q4_K_M (llama-server :8090)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    },
     "dspark": {
       "baseUrl": "http://127.0.0.1:8099/v1",
       "api": "openai-completions",

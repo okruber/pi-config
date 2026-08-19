@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.2",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-5",
+  "defaultModel": "claude-sonnet-5",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
@@ -19,6 +19,7 @@
     "anthropic/claude-sonnet-5",
     "anthropic/claude-opus-5",
     "openrouter/deepseek/deepseek-v4-flash-0731",
+    "llama/qwen3.5-35b-a3b",
     "lmstudio/qwen3.5-35b-a3b",
     "openai-codex/gpt-5.6-luna"
   ],
