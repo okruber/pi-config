@@ -8,12 +8,13 @@
     "git:github.com/obra/superpowers",
     "npm:pi-subagents",
     "npm:pi-mcp-adapter",
-    "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-web-access",
     "npm:@ff-labs/pi-fff",
     "npm:pi-cache-optimizer"
   ],
-  "skills": ["!skills/google-agents-cli-*"],
+  "skills": [
+    "!skills/google-agents-cli-*"
+  ],
   "enabledModels": [
     "anthropic/claude-sonnet-5",
     "anthropic/claude-opus-5",

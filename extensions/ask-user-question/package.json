@@ -1,0 +1,16 @@
+{
+	"name": "oek-ask-user-question",
+	"version": "2.6.2-fork.1",
+	"private": true,
+	"description": "Fork of @juicesharp/rpiv-ask-user-question that renders the questionnaire inline instead of as an overlay, so it never covers the transcript.",
+	"type": "module",
+	"license": "MIT",
+	"pi": {
+		"extensions": ["./index.ts"]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*",
+		"typebox": "*"
+	}
+}
