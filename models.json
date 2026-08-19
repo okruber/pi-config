@@ -27,6 +27,33 @@
         }
       ]
     },
+    "ornith": {
+      "baseUrl": "http://127.0.0.1:8091/v1",
+      "api": "openai-completions",
+      "apiKey": "ornith",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "thinkingFormat": "qwen-chat-template",
+        "chatTemplateKwargs": {
+          "enable_thinking": {
+            "$var": "thinking.enabled",
+            "omitWhenOff": true
+          }
+        }
+      },
+      "models": [
+        {
+          "id": "ornith-1.5-35b-a3b",
+          "name": "Ornith 1.5 35B A3B MoE Q4_K_M (llama-server :8091)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    },
     "dspark": {
       "baseUrl": "http://127.0.0.1:8099/v1",
       "api": "openai-completions",
@@ -69,15 +96,6 @@
           "name": "Gemma 4 26B A4B QAT MLX-4bit (LM Studio)",
           "reasoning": false,
           "input": ["text", "image"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "qwen3.5-35b-a3b",
-          "name": "Qwen 3.5 35B A3B MoE Q4_K_M (LM Studio)",
-          "reasoning": true,
-          "input": ["text"],
           "contextWindow": 131072,
           "maxTokens": 16384,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
