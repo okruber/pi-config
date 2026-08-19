@@ -64,3 +64,41 @@ export function nodeOrcaProbeDeps(): OrcaProbeDeps {
 		},
 	};
 }
+
+export const HANDOFF_SKILL_PATH = `${process.env.HOME}/.agents/skills/handoff/SKILL.md`;
+export const BRIEF_DIR = `${process.env.HOME}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Oek Vault/Logs/handoffs`;
+
+export function briefPath(task: string, today: string, briefDir: string): string {
+	const slug = task
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "")
+		.slice(0, 60)
+		.replace(/-$/, "");
+	return `${briefDir}/${today}-${slug}.md`;
+}
+
+export type HandoffFramingInput = {
+	task: string;
+	orcaBinary: string;
+	skillPath: string;
+	briefPath: string;
+};
+
+export function buildHandoffFraming(input: HandoffFramingInput): string {
+	return [
+		"[Side conversation. The main session above is context only and is handled by another agent.]",
+		"",
+		"You are dispatching a handoff. Do the work in this order:",
+		`1. Read ${input.skillPath} and follow it.`,
+		`2. Draft the handoff brief using that skill's template and write it to ${input.briefPath}.`,
+		"3. Show the brief and stop. Wait for the user's approval before dispatching. This is propose-first.",
+		`4. On approval, dispatch with this already-resolved Orca binary: ${input.orcaBinary}`,
+		"   Do not run `command -v orca` or search for the binary yourself. It has been resolved for you.",
+		"5. Report the created worktree or terminal handle and the brief path.",
+		"",
+		"If dispatch fails, say so plainly and report the brief path. Never claim a session was created when it was not.",
+		"",
+		`Task: ${input.task}`,
+	].join("\n");
+}

@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { BtwOverlay, matchesFocusShortcut } from "./overlay.js";
+import { BRIEF_DIR, briefPath, buildHandoffFraming, HANDOFF_SKILL_PATH, nodeOrcaProbeDeps, resolveOrcaBinary } from "./handoff.js";
 import { createSideSession, nodeSideSessionDeps, type SideSessionRuntime } from "./side-session.js";
 import { BTW_RESET_ENTRY, BTW_TURN_ENTRY, rehydrateThread, type BtwTurn } from "./thread.js";
 import { appendUserEntry, applyTranscriptEvent, emptyTranscript, type TranscriptState } from "./transcript.js";
@@ -185,6 +186,47 @@ export default function (pi: ExtensionAPI) {
 			overlay?.close();
 			overlay = null;
 			pi.appendEntry(BTW_RESET_ENTRY, {});
+		},
+	});
+
+	pi.registerCommand("btw:handoff", {
+		description: "Draft a handoff brief and dispatch an Orca session from the side thread",
+		handler: async (args, ctx) => {
+			const task = args.trim();
+			if (!task) {
+				ctx.ui.notify("Usage: /btw:handoff <what needs doing>", "warning");
+				return;
+			}
+
+			const orca = await resolveOrcaBinary(nodeOrcaProbeDeps());
+			if (!orca.ok) {
+				ctx.ui.notify(orca.reason, "error");
+				return;
+			}
+
+			const today = new Date().toISOString().slice(0, 10);
+			const framing = buildHandoffFraming({
+				task,
+				orcaBinary: orca.binary,
+				skillPath: HANDOFF_SKILL_PATH,
+				briefPath: briefPath(task, today, BRIEF_DIR),
+			});
+
+			await ensureOverlay(ctx);
+			transcript = appendUserEntry(transcript, `handoff: ${task}`);
+			overlay?.refresh();
+
+			const active = await ensureSession(ctx, framing);
+			if (thread.length > 0) {
+				await active.session.prompt(framing, { source: "extension" });
+			} else {
+				await active.session.prompt("", { source: "extension" });
+			}
+
+			const answer = transcript.entries.filter((e) => e.role === "assistant").at(-1)?.text ?? "";
+			const turn: BtwTurn = { question: `handoff: ${task}`, answer, kind: "handoff", timestamp: Date.now() };
+			thread.push(turn);
+			pi.appendEntry(BTW_TURN_ENTRY, turn);
 		},
 	});
 
