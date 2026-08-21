@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.2",
-  "defaultProvider": "openrouter",
-  "defaultModel": "stealth/ox-alpha",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-5",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
@@ -10,7 +10,8 @@
     "npm:pi-mcp-adapter",
     "npm:pi-web-access",
     "npm:@ff-labs/pi-fff",
-    "npm:pi-cache-optimizer"
+    "npm:pi-cache-optimizer",
+    "https://github.com/earendil-works/pi-transcribe"
   ],
   "skills": [
     "!skills/google-agents-cli-*"

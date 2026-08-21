@@ -5,8 +5,8 @@ name: Parchment
 details: lighter
 background: "#f9f5db"
 foreground: "#3b3624"
-accent: "#537850"
-cursor: "#537850"
+accent: "#3d5f3e"
+cursor: "#3d5f3e"
 # Orca's Warp importer ignores these two keys; selection colors live only in
 # the stored theme (orca-data.json). Re-importing this YAML drops them.
 selection: "#ded6b4"
@@ -15,8 +15,8 @@ terminal_colors:
   normal:
     black: "#3b3624"
     red: "#a84b50"
-    green: "#537850"
-    yellow: "#806828"
+    green: "#3d5f3e"
+    yellow: "#665010"
     blue: "#4f6a86"
     magenta: "#7a5c86"
     cyan: "#547068"

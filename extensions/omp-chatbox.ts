@@ -46,6 +46,8 @@ function formatTokens(count: number): string {
   return `${Math.round(count / 1000000)}M`
 }
 
+type StatusTheme = ExtensionContext['ui']['theme']
+
 function formatContext(ctx: ExtensionContext): string {
   const usage = ctx.getContextUsage()
   const window = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0
@@ -110,9 +112,28 @@ function thinkingColor(level: string): string {
 }
 
 // No background: the status line reads as part of the page, so the theme's
-// canvas shows through and only the field colors carry meaning.
-function makeSegment(theme: ExtensionContext['ui']['theme'], fg: string, text: string): string {
-  return theme.fg(fg as any, ` ${text} `)
+// canvas shows through and only the field colors carry meaning. Each field
+// gets its own hue plus bold on the value, so neighbours stay separable on
+// a low-contrast parchment canvas.
+function pad(text: string): string {
+  return ` ${text} `
+}
+
+function strong(theme: StatusTheme, color: string, text: string): string {
+  return theme.fg(color as any, theme.bold(text))
+}
+
+function quiet(theme: StatusTheme, color: string, text: string): string {
+  return theme.fg(color as any, text)
+}
+
+function contextSegment(theme: StatusTheme, ctx: ExtensionContext): string {
+  const text = formatContext(ctx)
+  const percent = ctx.getContextUsage()?.percent ?? null
+  if (percent === null) return quiet(theme, 'dim', text)
+  if (percent >= 90) return strong(theme, 'error', text)
+  if (percent >= 70) return strong(theme, 'warning', text)
+  return quiet(theme, 'muted', text)
 }
 
 function fitStatusLine(left: string, right: string, width: number, border: (text: string) => string): string {
@@ -205,22 +226,32 @@ export default function (pi: ExtensionAPI) {
         const usingSub = ctx.model ? (ctx.modelRegistry as any).isUsingOAuth?.(ctx.model) : false
 
         const parts = [
-          makeSegment(theme, 'accent', 'π'),
-          makeSegment(theme, 'toolTitle', `✺ ${modelLabel(ctx)}`),
-          makeSegment(theme, thinkingColor(thinking), `● ${thinking === 'off' ? 'off' : thinking}`),
-          makeSegment(theme, 'success', `⌘ ${compactPath(ctx.cwd)}${branch ? `:${branch}` : ''}`),
-          makeSegment(theme, 'muted', formatContext(ctx)),
+          pad(strong(theme, 'accent', 'π')),
+          pad(`${quiet(theme, 'mdListBullet', '✺')} ${strong(theme, 'toolTitle', modelLabel(ctx))}`),
+          pad(strong(theme, thinkingColor(thinking), `● ${thinking === 'off' ? 'off' : thinking}`)),
+          pad(
+            `${quiet(theme, 'dim', '⌘')} ${strong(theme, 'mdLink', compactPath(ctx.cwd))}${
+              branch ? quiet(theme, 'muted', `:${branch}`) : ''
+            }`,
+          ),
+          pad(contextSegment(theme, ctx)),
         ]
 
         if (cost > 0 || usingSub) {
           const label = usingSub ? subscriptionLabel(ctx) : undefined
           const subSuffix = usingSub ? ` (sub${label ? `: ${label}` : ''})` : ''
-          parts.push(makeSegment(theme, 'warning', `$${cost.toFixed(cost >= 10 ? 2 : 3)}${subSuffix}`))
+          parts.push(
+            pad(
+              `${strong(theme, 'customMessageLabel', `$${cost.toFixed(cost >= 10 ? 2 : 3)}`)}${
+                subSuffix ? quiet(theme, 'dim', subSuffix) : ''
+              }`,
+            ),
+          )
         }
 
         const left = parts.join(sep)
         const sessionName = ctx.sessionManager.getSessionName()
-        const right = sessionName ? makeSegment(theme, 'accent', sessionName) : ''
+        const right = sessionName ? pad(strong(theme, 'accent', sessionName)) : ''
 
         lines[0] = border('╭─') + fitStatusLine(left, right, innerWidth, border)
         const removedBottomIndex = removeBottomEditorBorder(lines, innerWidth)
