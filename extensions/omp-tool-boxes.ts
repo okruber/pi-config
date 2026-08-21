@@ -1,5 +1,8 @@
 // Make Pi tool-result highlights look more like the OMP harness: a card fill
-// from the theme, plus a thin rounded border that carries the run state.
+// from the theme, plus a rounded box-drawing border that carries the run state.
+// Standard glyphs only (╭─╮ │ ╰─╯); exotic block glyphs render badly in
+// several terminal fonts. Error uses the muted token: the red error token is
+// too loud for this theme, the fill tint carries the signal.
 // This is intentionally defensive because it patches Pi's internal TUI class.
 
 import { createRequire } from 'node:module'
@@ -94,7 +97,7 @@ export default async function () {
       }
 
       const borderToken =
-        state === 'pending' ? 'borderMuted' : state === 'error' ? 'error' : 'border'
+        state === 'pending' ? 'borderMuted' : state === 'error' ? 'muted' : 'border'
       const fillToken =
         state === 'pending' ? 'toolPendingBg' : state === 'error' ? 'toolErrorBg' : 'toolSuccessBg'
 
@@ -127,17 +130,15 @@ export default async function () {
             })
           : text
 
-      // One-eighth blocks draw on the cell boundary, so the edge lines up with
-      // the fill. A thin │ sits mid-cell, which leaves fill outside the line.
-      const top = colorBorder(`\u{1FB7D}${'▔'.repeat(innerWidth)}\u{1FB7E}`)
-      const bottom = colorBorder(`\u{1FB7C}${'▁'.repeat(innerWidth)}\u{1FB7F}`)
+      const top = colorBorder(`╭${'─'.repeat(innerWidth)}╮`)
+      const bottom = colorBorder(`╰${'─'.repeat(innerWidth)}╯`)
       // Renderers emit blank rows and rows narrower than the box, so paint the
       // gutter instead of padding with bare spaces that let the canvas through.
       const boxed = body.map((line) => {
         const blank = isBlank(line)
         const content = blank ? '' : keepFilled(line)
         const pad = ' '.repeat(Math.max(0, innerWidth - (blank ? 0 : visibleWidth(line))))
-        return colorBorder('▏') + fill(content + pad) + colorBorder('▕')
+        return colorBorder('│') + fill(content + pad) + colorBorder('│')
       })
 
       return [...leading, top, ...boxed, bottom]
