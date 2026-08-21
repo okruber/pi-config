@@ -127,16 +127,17 @@ export default async function () {
             })
           : text
 
-      const horizontal = '─'.repeat(innerWidth)
-      const top = colorBorder(`╭${horizontal}╮`)
-      const bottom = colorBorder(`╰${horizontal}╯`)
+      // One-eighth blocks draw on the cell boundary, so the edge lines up with
+      // the fill. A thin │ sits mid-cell, which leaves fill outside the line.
+      const top = colorBorder(`\u{1FB7D}${'▔'.repeat(innerWidth)}\u{1FB7E}`)
+      const bottom = colorBorder(`\u{1FB7C}${'▁'.repeat(innerWidth)}\u{1FB7F}`)
       // Renderers emit blank rows and rows narrower than the box, so paint the
       // gutter instead of padding with bare spaces that let the canvas through.
       const boxed = body.map((line) => {
         const blank = isBlank(line)
         const content = blank ? '' : keepFilled(line)
         const pad = ' '.repeat(Math.max(0, innerWidth - (blank ? 0 : visibleWidth(line))))
-        return colorBorder('│') + fill(content + pad) + colorBorder('│')
+        return colorBorder('▏') + fill(content + pad) + colorBorder('▕')
       })
 
       return [...leading, top, ...boxed, bottom]
