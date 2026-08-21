@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
@@ -12,9 +12,13 @@ const RENDER_INTERVAL_MS = 500;
 // what actually picks up the finished turn.
 const STATS_SETTLE_MS = 2500;
 
-const STATS_FILE = join(
+// pi-cache-optimizer v7 stores per-process shards here (atomic tmp+rename
+// writes) and deletes the legacy aggregate pi-cache-optimizer-stats.json on
+// startup, so the powerline aggregates the shards itself.
+const SHARDS_DIR = join(
 	process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
-	"pi-cache-optimizer-stats.json",
+	"pi-cache-optimizer-stats.d",
+	"shards",
 );
 
 // Powerline left wedge (U+E0B2), supplied by Symbols Nerd Font as a fallback glyph.
@@ -40,7 +44,7 @@ type PersistedStats = {
 };
 
 let sessionHash: string | undefined;
-let statsCache: { mtimeMs: number; data: PersistedStats } | undefined;
+let statsCache: { signature: string; data: PersistedStats } | undefined;
 
 let currentCtx: ExtensionContext | undefined;
 let currentTui: { requestRender(): void } | undefined;
@@ -127,16 +131,69 @@ export function dayLabel(counters: CacheCounters): string {
 	return ` ${hitPercent(counters)} day `;
 }
 
-function readStats(): PersistedStats | undefined {
+function addCounters(a: CacheCounters | undefined, b: CacheCounters): CacheCounters {
+	if (!a) return b;
+	return {
+		day: a.day,
+		totalRequests: a.totalRequests + b.totalRequests,
+		hitRequests: a.hitRequests + b.hitRequests,
+		cachedInputTokens: a.cachedInputTokens + b.cachedInputTokens,
+		totalInputTokens: a.totalInputTokens + b.totalInputTokens,
+	};
+}
+
+// Mirrors the optimizer's own shard aggregation for display purposes. Unlike
+// refreshShardAggregate it does not track modelEpoch resets, so a just-rolled
+// epoch may briefly double-count until its old shard entry ages out at midnight.
+export function readStats(today: string): PersistedStats {
+	let names: string[];
 	try {
-		const mtimeMs = statSync(STATS_FILE).mtimeMs;
-		if (statsCache?.mtimeMs !== mtimeMs) {
-			statsCache = { mtimeMs, data: JSON.parse(readFileSync(STATS_FILE, "utf8")) as PersistedStats };
-		}
-		return statsCache.data;
+		names = readdirSync(SHARDS_DIR).filter((name) => /^[0-9a-f-]{36}\.json$/i.test(name));
+		names.sort();
 	} catch {
-		return undefined;
+		return {};
 	}
+	let signature = "";
+	for (const name of names) {
+		try {
+			signature += `${name}:${statSync(join(SHARDS_DIR, name)).mtimeMs};`;
+		} catch {
+			signature += `${name}:gone;`;
+		}
+	}
+	if (statsCache?.signature === signature) return statsCache.data;
+
+	const sessions: NonNullable<PersistedStats["sessions"]> = {};
+	const totalsByModel: NonNullable<PersistedStats["totalsByModel"]> = {};
+	for (const name of names) {
+		let shard: any;
+		try {
+			shard = JSON.parse(readFileSync(join(SHARDS_DIR, name), "utf8"));
+		} catch {
+			continue;
+		}
+		if (shard?.version !== 7 || shard?.kind !== "pi-cache-optimizer-shard") continue;
+		const models = shard.models ?? {};
+		for (const [modelKey, entry] of Object.entries<any>(models)) {
+			const s = entry?.stats;
+			if (!s || s.day !== today) continue;
+			const counters: CacheCounters = {
+				day: s.day,
+				totalRequests: s.totalRequests ?? 0,
+				hitRequests: s.hitRequests ?? 0,
+				cachedInputTokens: s.cachedInputTokens ?? 0,
+				totalInputTokens: s.totalInputTokens ?? 0,
+			};
+			if (typeof shard.sessionHash === "string") {
+				const slot = (sessions[shard.sessionHash] ??= {});
+				slot[modelKey] = addCounters(slot[modelKey], counters);
+			}
+			totalsByModel[modelKey] = addCounters(totalsByModel[modelKey], counters);
+		}
+	}
+	const data = { sessions, totalsByModel };
+	statsCache = { signature, data };
+	return data;
 }
 
 function currentRate(): number {
@@ -194,8 +251,8 @@ function renderRow(width: number, colors: Record<"teal" | "peach" | "yellow", Co
 	const modelKey = model ? `${model.provider}/${model.id}` : undefined;
 
 	if (modelKey) {
-		const stats = readStats();
 		const today = localDay();
+		const stats = readStats(today);
 		const session = usableCounters(
 			sessionHash ? stats?.sessions?.[sessionHash]?.[modelKey] : undefined,
 			today,
