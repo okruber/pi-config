@@ -7,6 +7,10 @@ background: "#f9f5db"
 foreground: "#3b3624"
 accent: "#537850"
 cursor: "#537850"
+# Orca's Warp importer ignores these two keys; selection colors live only in
+# the stored theme (orca-data.json). Re-importing this YAML drops them.
+selection: "#ded6b4"
+selectionText: "#3b3624"
 terminal_colors:
   normal:
     black: "#3b3624"

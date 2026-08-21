@@ -186,7 +186,7 @@ export function buildSegments(width: number, segments: Segment[]): string[] {
 	return [" ".repeat(width - rowWidth()) + body];
 }
 
-function renderRow(width: number, colors: Record<"teal" | "peach" | "yellow", Color>): string[] {
+function renderRow(width: number, colors: Record<"teal" | "green" | "peach" | "yellow", Color>): string[] {
 	if (width < 4) return [];
 
 	const segments: Segment[] = [];
@@ -203,7 +203,11 @@ function renderRow(width: number, colors: Record<"teal" | "peach" | "yellow", Co
 		const total = usableCounters(stats?.totalsByModel?.[modelKey], today);
 		if (session) {
 			const warned = readCacheStatus()?.includes("⚠️") ?? false;
-			segments.push({ label: sessionLabel(session, warned), color: colors.peach });
+			// A perfect hit run stays quiet; the segment only heats up when the
+			// cache actually missed, so red means "look at this" rather than
+			// being ambient.
+			const missed = session.hitRequests < session.totalRequests;
+			segments.push({ label: sessionLabel(session, warned), color: missed ? colors.peach : colors.green });
 		}
 		if (total) segments.push({ label: dayLabel(total), color: colors.yellow });
 	}
@@ -239,6 +243,7 @@ export default function (pi: ExtensionAPI) {
 						if (!colors) {
 							colors = {
 								teal: themeColor(theme, "teal", "cyan"),
+								green: themeColor(theme, "green"),
 								peach: themeColor(theme, "peach", "red"),
 								yellow: themeColor(theme, "yellow", "olive"),
 							};
