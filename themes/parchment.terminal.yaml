@@ -1,0 +1,28 @@
+# Terminal companion to parchment.json. pi cannot paint the terminal
+# background, so the cream ground has to come from the terminal itself.
+# Warp-format YAML, which is what Orca's "Import from YAML" reads.
+name: Parchment
+details: lighter
+background: "#f9f5db"
+foreground: "#3b3624"
+accent: "#537850"
+cursor: "#537850"
+terminal_colors:
+  normal:
+    black: "#3b3624"
+    red: "#a84b50"
+    green: "#537850"
+    yellow: "#806828"
+    blue: "#4f6a86"
+    magenta: "#7a5c86"
+    cyan: "#547068"
+    white: "#948f7b"
+  bright:
+    black: "#787566"
+    red: "#b96064"
+    green: "#668c62"
+    yellow: "#99803c"
+    blue: "#64809b"
+    magenta: "#8f719b"
+    cyan: "#67857c"
+    white: "#ece9cc"
