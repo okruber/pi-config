@@ -11,7 +11,7 @@
     "hairline": "#b5b19c",
     "hairlineSoft": "#c9c5b0",
     "blue": "#4f6a86",
-    "green": "#537850",
+    "green": "#3d5f3e",
     "olive": "#806828",
     "sepia": "#6b4a2b",
     "sepiaDeep": "#4a4028",
@@ -26,9 +26,9 @@
     "thumb": "#cfcbb3"
   },
   "colors": {
-    "accent": "green",
+    "accent": "blue",
     "border": "hairline",
-    "borderAccent": "green",
+    "borderAccent": "blue",
     "borderMuted": "hairlineSoft",
     "success": "green",
     "error": "red",
