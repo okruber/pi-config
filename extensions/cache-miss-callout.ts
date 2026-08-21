@@ -47,7 +47,8 @@ export default async function (pi: ExtensionAPI) {
 		const miss = detectCacheMiss(
 			ctx.sessionManager.getEntries(),
 			message,
-			ctx.modelRegistry,
+			// cache-stats wants the runtime's getModel; the registry equivalent is find().
+			{ getModel: (provider, modelId) => ctx.modelRegistry.find(provider, modelId) },
 		);
 		if (!miss) return;
 		if (miss.missedTokens < MIN_TOKENS && miss.missedCost < MIN_COST) return;
