@@ -109,8 +109,10 @@ function thinkingColor(level: string): string {
   }
 }
 
+// No background: the status line reads as part of the page, so the theme's
+// canvas shows through and only the field colors carry meaning.
 function makeSegment(theme: ExtensionContext['ui']['theme'], fg: string, text: string): string {
-  return theme.bg('toolSuccessBg', theme.fg(fg as any, ` ${text} `))
+  return theme.fg(fg as any, ` ${text} `)
 }
 
 function fitStatusLine(left: string, right: string, width: number, border: (text: string) => string): string {
@@ -197,7 +199,7 @@ export default function (pi: ExtensionAPI) {
 
         const theme = ctx.ui.theme
         const border = (text: string) => this.borderColor(text)
-        const sep = theme.bg('toolSuccessBg', theme.fg('borderMuted', ` ${SEP} `))
+        const sep = theme.fg('borderMuted', ` ${SEP} `)
         const thinking = typeof (pi as any).getThinkingLevel === 'function' ? (pi as any).getThinkingLevel() : 'off'
         const cost = totalCost(ctx)
         const usingSub = ctx.model ? (ctx.modelRegistry as any).isUsingOAuth?.(ctx.model) : false

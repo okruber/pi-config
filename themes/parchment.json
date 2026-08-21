@@ -17,9 +17,7 @@
     "purple": "#7a5c86",
     "selectedBg": "#e4e0c7",
     "userBg": "#eeead0",
-    "pendingBg": "#f1edd4",
-    "successBg": "#e2e4c8",
-    "errorBg": "#eedfc9",
+    "wellBg": "#edead0",
     "customBg": "#eae3d1",
     "searchBg": "#ded6b4",
     "thumb": "#cfcbb3"
@@ -46,9 +44,9 @@
     "customMessageBg": "customBg",
     "customMessageText": "ink",
     "customMessageLabel": "purple",
-    "toolPendingBg": "pendingBg",
-    "toolSuccessBg": "successBg",
-    "toolErrorBg": "errorBg",
+    "toolPendingBg": "wellBg",
+    "toolSuccessBg": "wellBg",
+    "toolErrorBg": "wellBg",
     "toolTitle": "ink",
     "toolOutput": "body",
 

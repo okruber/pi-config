@@ -1,5 +1,5 @@
-// Make Pi tool-result highlights look more like the OMP harness:
-// subtle Catppuccin card fill from the theme, plus a thin rounded border.
+// Make Pi tool-result highlights look more like the OMP harness: a card fill
+// from the theme, plus a thin rounded border that carries the run state.
 // This is intentionally defensive because it patches Pi's internal TUI class.
 
 import { createRequire } from 'node:module'
@@ -85,9 +85,18 @@ export default async function () {
       const body = lines.slice(firstBodyLine)
       if (body.length === 0) return lines
 
+      // Themes may fill every state with one tone, so the border carries the
+      // state instead. isPartial/result are Pi internals; fall back if absent.
+      let borderToken = 'borderMuted'
+      try {
+        borderToken = this.isPartial ? 'borderMuted' : this.result?.isError ? 'error' : 'border'
+      } catch {
+        borderToken = 'borderMuted'
+      }
+
       const colorBorder = (text: string) => {
         try {
-          return theme.fg('borderMuted', text)
+          return theme.fg(borderToken, text)
         } catch {
           return text
         }
