@@ -13,9 +13,8 @@ function fallbackVisibleWidth(text: string): number {
   return Array.from(text.replace(ANSI_RE, '')).length
 }
 
-function padVisible(line: string, width: number, visibleWidth: (text: string) => number): string {
-  const pad = Math.max(0, width - visibleWidth(line))
-  return line + ' '.repeat(pad)
+function isBlank(line: string): boolean {
+  return line.replace(ANSI_RE, '').trim().length === 0
 }
 
 export default async function () {
@@ -87,12 +86,17 @@ export default async function () {
 
       // Themes may fill every state with one tone, so the border carries the
       // state instead. isPartial/result are Pi internals; fall back if absent.
-      let borderToken = 'borderMuted'
+      let state: 'pending' | 'error' | 'success' = 'pending'
       try {
-        borderToken = this.isPartial ? 'borderMuted' : this.result?.isError ? 'error' : 'border'
+        state = this.isPartial ? 'pending' : this.result?.isError ? 'error' : 'success'
       } catch {
-        borderToken = 'borderMuted'
+        state = 'pending'
       }
+
+      const borderToken =
+        state === 'pending' ? 'borderMuted' : state === 'error' ? 'error' : 'border'
+      const fillToken =
+        state === 'pending' ? 'toolPendingBg' : state === 'error' ? 'toolErrorBg' : 'toolSuccessBg'
 
       const colorBorder = (text: string) => {
         try {
@@ -102,12 +106,36 @@ export default async function () {
         }
       }
 
+      const fill = (text: string) => {
+        try {
+          return theme.bg(fillToken, text)
+        } catch {
+          return text
+        }
+      }
+
+      // Rows that close the fill mid-line would show the canvas from there on,
+      // so re-open it after every sequence that resets the background.
+      const fillOpen = /^\x1b\[[0-9;]*m/.exec(fill(' '))?.[0] ?? ''
+      const keepFilled = (text: string) =>
+        fillOpen
+          ? text.replace(ANSI_RE, (seq) => {
+              const params = seq.slice(2, -1).split(';')
+              return params.some((p) => p === '' || p === '0' || p === '49') ? seq + fillOpen : seq
+            })
+          : text
+
       const horizontal = '─'.repeat(innerWidth)
       const top = colorBorder(`╭${horizontal}╮`)
       const bottom = colorBorder(`╰${horizontal}╯`)
-      const boxed = body.map(
-        (line) => colorBorder('│') + padVisible(line, innerWidth, visibleWidth) + colorBorder('│'),
-      )
+      // Renderers emit blank rows and rows narrower than the box, so paint the
+      // gutter instead of padding with bare spaces that let the canvas through.
+      const boxed = body.map((line) => {
+        const blank = isBlank(line)
+        const content = blank ? '' : keepFilled(line)
+        const pad = ' '.repeat(Math.max(0, innerWidth - (blank ? 0 : visibleWidth(line))))
+        return colorBorder('│') + fill(content + pad) + colorBorder('│')
+      })
 
       return [...leading, top, ...boxed, bottom]
     }
