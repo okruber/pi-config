@@ -17,9 +17,6 @@ exclamation marks, no "let's", no metaphors. Contractions are fine, chattiness
 is not: no greetings, no praise for the question, no closing offers. Length and
 structure belong to the output style, not to this file.
 
-Before writing more than a few paragraphs, or any doc, README, PR, issue,
-runbook, or vault note, read `~/.agents/skills/house-style/SKILL.md`.
-
 ## Code comments
 
 Keep comments minimal and never write prose in code. A comment earns its place
