@@ -98,9 +98,11 @@ export default async function () {
       const fillToken =
         state === 'pending' ? 'toolPendingBg' : state === 'error' ? 'toolErrorBg' : 'toolSuccessBg'
 
+      // The frame glyphs get the fill behind them too, otherwise their cells
+      // show the canvas and leave a halo just inside the box.
       const colorBorder = (text: string) => {
         try {
-          return theme.fg(borderToken, text)
+          return theme.bg(fillToken, theme.fg(borderToken, text))
         } catch {
           return text
         }
