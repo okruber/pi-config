@@ -79,17 +79,7 @@ function subscriptionLabel(ctx: ExtensionContext): string | undefined {
 
   const envKeyBase = provider.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()
   const envLabel = process.env[`PI_${envKeyBase}_EMAIL`] || process.env[`PI_${envKeyBase}_LABEL`]
-  if (envLabel?.trim()) return envLabel.trim()
-
-  const labelsJson = process.env.PI_CLAUDE_SUBSCRIPTION_LABELS
-  if (!labelsJson) return undefined
-  try {
-    const labels = JSON.parse(labelsJson) as Record<string, unknown>
-    const label = labels[provider]
-    return typeof label === 'string' && label.trim() ? label.trim() : undefined
-  } catch {
-    return undefined
-  }
+  return envLabel?.trim() || undefined
 }
 
 // No background: the status line reads as part of the page, so the theme's

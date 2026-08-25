@@ -32,8 +32,6 @@
       "allow": [
         "inherit",
         "anthropic/*",
-        "claude-imeto/*",
-        "claude-arrive/*",
         "openrouter/*",
         "openai-codex/*",
         "llama/*",

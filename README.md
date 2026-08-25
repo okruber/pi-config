@@ -11,6 +11,5 @@ git clone git@github.com:okruber/pi-config.git ~/Documents/Personal/pi-config
 cd ~/Documents/Personal/pi-config && ./install.sh
 ```
 
-Secrets and machine state (`auth.json`, `telegram.json`,
-`claude-subscriptions.json`, `sessions/`, `npm/`, `git/`, `bin/`) are
-intentionally untracked.
+Secrets and machine state (`auth.json`, `telegram.json`, `sessions/`, `npm/`,
+`git/`, `bin/`) are intentionally untracked.
