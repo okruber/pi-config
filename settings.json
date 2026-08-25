@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.84.2",
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-5",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-luna",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:@llblab/pi-telegram",
@@ -11,7 +11,8 @@
     "npm:pi-web-access",
     "npm:@ff-labs/pi-fff",
     "npm:pi-cache-optimizer",
-    "https://github.com/earendil-works/pi-transcribe"
+    "https://github.com/earendil-works/pi-transcribe",
+    "npm:@ogulcancelik/pi-herdr"
   ],
   "skills": [
     "!skills/google-agents-cli-*"
@@ -25,6 +26,23 @@
     "openai-codex/gpt-5.6-luna",
     "openrouter/stealth/ox-alpha"
   ],
+  "subagents": {
+    "modelScope": {
+      "enforce": true,
+      "allow": [
+        "inherit",
+        "anthropic/*",
+        "claude-imeto/*",
+        "claude-arrive/*",
+        "openrouter/*",
+        "openai-codex/*",
+        "llama/*",
+        "ornith/*",
+        "dspark/*",
+        "lmstudio/*"
+      ]
+    }
+  },
   "theme": "parchment",
   "showCacheMissNotices": false
 }
