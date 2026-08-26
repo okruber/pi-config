@@ -13,3 +13,13 @@ cd ~/Documents/Personal/pi-config && ./install.sh
 
 Secrets and machine state (`auth.json`, `telegram.json`, `sessions/`, `npm/`,
 `git/`, `bin/`) are intentionally untracked.
+
+## Scoped models
+
+`scoped-models.json` is the source of truth for the model picker and subagent
+scope.
+
+```bash
+node scripts/sync-model-scope.mjs
+node scripts/sync-model-scope.mjs --check
+```
