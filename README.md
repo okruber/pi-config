@@ -23,3 +23,15 @@ scope.
 node scripts/sync-model-scope.mjs
 node scripts/sync-model-scope.mjs --check
 ```
+
+## Im­eto terminal UI
+
+The Pi theme and terminal-emulator theme must be used together.
+
+1. Import `themes/imeto-bone.terminal.yaml` into Orca as a custom terminal theme.
+2. Select `Imeto Bone` for the Orca terminal.
+3. Run `/reload` in Pi.
+
+The terminal supplies the Bone background. Pi supplies message, tool, Markdown,
+diff, syntax, and status colors. The first stage intentionally omits the mockup's
+persistent side rails because Pi extensions cannot reserve those columns.
