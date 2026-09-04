@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
+import { hexToBg, hexToFg, readThemeHex } from "./imeto-style.ts";
 
 const WIDGET_KEY = "token-speed";
 const CHARS_PER_TOKEN = 4;
@@ -66,24 +67,8 @@ export function rateLabel(isStreaming: boolean, rate: number): string {
 // resort. Themes that resolve to a hex value also yield a background form,
 // which the powerline separator needs to sit on the preceding segment.
 export function themeColor(theme: Theme, ...varNames: string[]): Color {
-	try {
-		if (theme.sourcePath) {
-			const parsed = JSON.parse(readFileSync(theme.sourcePath, "utf8")) as {
-				vars?: Record<string, string>;
-			};
-			for (const varName of varNames) {
-				const hex = parsed.vars?.[varName];
-				if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) {
-					const r = parseInt(hex.slice(1, 3), 16);
-					const g = parseInt(hex.slice(3, 5), 16);
-					const b = parseInt(hex.slice(5, 7), 16);
-					return { fg: `\x1b[38;2;${r};${g};${b}m`, bg: `\x1b[48;2;${r};${g};${b}m` };
-				}
-			}
-		}
-	} catch {
-		// fall through to accent
-	}
+	const hex = readThemeHex(theme.sourcePath, varNames)
+	if (hex) return { fg: hexToFg(hex), bg: hexToBg(hex) }
 	return { fg: theme.getFgAnsi("accent") };
 }
 
@@ -295,9 +280,9 @@ export default function (pi: ExtensionAPI) {
 						const theme = currentCtx.ui.theme;
 						if (!colors) {
 							colors = {
-								teal: themeColor(theme, "teal", "cyan"),
-								peach: themeColor(theme, "peach", "red"),
-								yellow: themeColor(theme, "yellow", "olive"),
+								teal: themeColor(theme, "mossGreen", "teal", "cyan"),
+								peach: themeColor(theme, "oxblood", "peach", "red"),
+								yellow: themeColor(theme, "terracotta", "yellow", "olive"),
 							};
 						}
 						return renderRow(width, colors);

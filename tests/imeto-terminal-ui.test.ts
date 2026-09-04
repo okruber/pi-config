@@ -116,3 +116,10 @@ test('status widths fit wide and narrow terminals', () => {
   assert.deepEqual(fitStatusWidths(70, 20, 40), { left: 37, right: 0, gap: 3 })
   assert.deepEqual(fitStatusWidths(12, 0, 20), { left: 12, right: 0, gap: 8 })
 })
+
+test('token-speed prefers semantic Imeto variables', () => {
+  const source = readFileSync(new URL('../extensions/token-speed.ts', import.meta.url), 'utf8')
+  assert.match(source, /themeColor\(theme, "mossGreen", "teal", "cyan"\)/)
+  assert.match(source, /themeColor\(theme, "oxblood", "peach", "red"\)/)
+  assert.match(source, /themeColor\(theme, "terracotta", "yellow", "olive"\)/)
+})
