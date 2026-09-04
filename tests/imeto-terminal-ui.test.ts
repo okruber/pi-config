@@ -9,6 +9,12 @@ import {
   hexToFg,
   readThemeHex,
 } from '../extensions/imeto-style.ts'
+import {
+  contextRole,
+  fitStatusWidths,
+  statusHex,
+  statusText,
+} from '../extensions/imeto-status.ts'
 
 const EXPECTED = {
   oxblood: '#6a3026',
@@ -72,4 +78,41 @@ test('terminal theme pairs Bone background with Deep Navy foreground', () => {
   assert.match(yaml, /^background: "#e9e3df"$/m)
   assert.match(yaml, /^foreground: "#04162a"$/m)
   assert.match(yaml, /^selection: "#907062"$/m)
+})
+
+test('status roles map to the approved Imeto palette', () => {
+  assert.equal(statusHex('identity'), IMETO_COLORS.oxblood)
+  assert.equal(statusHex('model'), IMETO_COLORS.dustyBlue)
+  assert.equal(statusHex('reasoning'), IMETO_COLORS.mossGreen)
+  assert.equal(statusHex('path'), IMETO_COLORS.terracotta)
+  assert.equal(statusHex('context'), IMETO_COLORS.mauveTaupe)
+  assert.equal(statusHex('danger'), IMETO_COLORS.oxblood)
+})
+
+test('status roles honor matching variables from the active theme', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'imeto-status-'))
+  const sourcePath = join(dir, 'theme.json')
+  writeFileSync(sourcePath, JSON.stringify({ vars: { oxblood: '#123456' } }))
+  assert.equal(statusHex('identity', sourcePath), '#123456')
+  assert.equal(statusHex('model', sourcePath), IMETO_COLORS.dustyBlue)
+})
+
+test('context pressure selects neutral, warning, and danger roles', () => {
+  assert.equal(contextRole(null), 'muted')
+  assert.equal(contextRole(69.9), 'context')
+  assert.equal(contextRole(70), 'path')
+  assert.equal(contextRole(89.9), 'path')
+  assert.equal(contextRole(90), 'danger')
+})
+
+test('status text closes bold and foreground ANSI state', () => {
+  const text = statusText('identity', 'π')
+  assert.match(text, /^\x1b\[38;2;106;48;38m\x1b\[1mπ/)
+  assert.match(text, /\x1b\[22m\x1b\[39m$/)
+})
+
+test('status widths fit wide and narrow terminals', () => {
+  assert.deepEqual(fitStatusWidths(70, 20, 80), { left: 70, right: 7, gap: 3 })
+  assert.deepEqual(fitStatusWidths(70, 20, 40), { left: 37, right: 0, gap: 3 })
+  assert.deepEqual(fitStatusWidths(12, 0, 20), { left: 12, right: 0, gap: 8 })
 })

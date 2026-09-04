@@ -6,6 +6,7 @@ import {
 } from '@earendil-works/pi-coding-agent'
 import type { Component, EditorTheme, TUI } from '@earendil-works/pi-tui'
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
+import { contextRole, fitStatusWidths, statusText, type StatusRole } from './imeto-status.ts'
 
 const SEP = '›'
 const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]/g
@@ -82,32 +83,8 @@ function subscriptionLabel(ctx: ExtensionContext): string | undefined {
   return envLabel?.trim() || undefined
 }
 
-// No background: the status line reads as part of the page, so the theme's
-// canvas shows through and only the field colors carry meaning. Each field
-// gets its own hue plus bold on the value, so neighbours stay separable on
-// a low-contrast parchment canvas.
-//
-// Group hues are painted directly (truecolor SGR) instead of through theme
-// tokens so the vivid rainbow here never leaks into markdown, diffs, or tool
-// output. Orange/yellow are deepened from the requested #F28322/#FEC20B,
-// which sit at 2.4:1 / 1.5:1 on the cream canvas.
-const RAINBOW = {
-  red: '#D92534',
-  blue: '#2072B2',
-  green: '#0B8C50',
-  orange: '#B85E14',
-  yellow: '#8A6D00',
-}
-
-function sgrFg(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `\x1b[38;2;${r};${g};${b}m`
-}
-
-function vivid(hex: string, text: string, bold = true): string {
-  return `${sgrFg(hex)}${bold ? '\x1b[1m' : ''}${text}${bold ? '\x1b[22m' : ''}\x1b[39m`
+function vivid(theme: StatusTheme, role: StatusRole, text: string, bold = true): string {
+  return statusText(role, text, bold, theme.sourcePath)
 }
 function pad(text: string): string {
   return ` ${text} `
@@ -124,28 +101,16 @@ function quiet(theme: StatusTheme, color: string, text: string): string {
 function contextSegment(ctx: ExtensionContext): string {
   const text = formatContext(ctx)
   const percent = ctx.getContextUsage()?.percent ?? null
-  if (percent === null) return `\x1b[2m${text}\x1b[22m`
-  if (percent >= 90) return vivid(RAINBOW.red, text)
-  if (percent >= 70) return vivid(RAINBOW.orange, text)
-  return vivid(RAINBOW.yellow, text)
+  return vivid(ctx.ui.theme, contextRole(percent), text, percent !== null)
 }
 
 function fitStatusLine(left: string, right: string, width: number, border: (text: string) => string): string {
   if (width <= 0) return ''
 
-  let leftText = left
-  let rightText = right
-  const minimumGap = rightText ? 3 : 0
-
-  while (visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width && visibleWidth(rightText) > 0) {
-    rightText = truncateToWidth(rightText, Math.max(0, visibleWidth(rightText) - 1), '')
-  }
-  while (visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width && visibleWidth(leftText) > 0) {
-    leftText = truncateToWidth(leftText, Math.max(0, visibleWidth(leftText) - 1), '')
-  }
-
-  const gap = Math.max(0, width - visibleWidth(leftText) - visibleWidth(rightText))
-  return leftText + border('─'.repeat(gap)) + rightText
+  const fitted = fitStatusWidths(visibleWidth(left), visibleWidth(right), width)
+  const leftText = truncateToWidth(left, fitted.left, '')
+  const rightText = truncateToWidth(right, fitted.right, '')
+  return leftText + border('─'.repeat(fitted.gap)) + rightText
 }
 
 function stripAnsi(text: string): string {
@@ -179,6 +144,7 @@ export default function (pi: ExtensionAPI) {
   })
 
   pi.on('session_start', (_event, ctx) => {
+    if (ctx.mode !== 'tui') return
     ctx.ui.setFooter((_tui, _theme, footerData) => {
       const bridge: StatusBridge = {
         version: 1,
@@ -220,11 +186,11 @@ export default function (pi: ExtensionAPI) {
         const usingSub = ctx.model ? (ctx.modelRegistry as any).isUsingOAuth?.(ctx.model) : false
 
         const parts = [
-          pad(vivid(RAINBOW.red, 'π')),
-          pad(`${vivid(RAINBOW.blue, '✺')} ${vivid(RAINBOW.blue, modelLabel(ctx))}`),
-          pad(vivid(RAINBOW.green, `● ${thinking === 'off' ? 'off' : thinking}`)),
+          pad(vivid(theme, 'identity', 'π')),
+          pad(`${vivid(theme, 'model', '✺')} ${vivid(theme, 'model', modelLabel(ctx))}`),
+          pad(vivid(theme, 'reasoning', `● ${thinking === 'off' ? 'off' : thinking}`)),
           pad(
-            `${quiet(theme, 'dim', '⌘')} ${vivid(RAINBOW.orange, compactPath(ctx.cwd))}${
+            `${quiet(theme, 'dim', '⌘')} ${vivid(theme, 'path', compactPath(ctx.cwd))}${
               branch ? quiet(theme, 'muted', `:${branch}`) : ''
             }`,
           ),
