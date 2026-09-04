@@ -1,0 +1,135 @@
+<style>
+  :root {
+    --bone: #e9e3df;
+    --navy: #04162a;
+    --oxblood: #6a3026;
+    --moss: #3e4739;
+    --mauve: #907062;
+    --cloud: #fbf9f7;
+    --sage: #89897c;
+    --blue: #52677d;
+    --terra: #a56148;
+  }
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+  .card { display: flex; flex-direction: column; overflow: hidden; }
+  .card-image { padding: 0; background: var(--bone); flex: 1; }
+  .terminal {
+    min-height: 455px;
+    padding: 18px;
+    background: var(--bone);
+    color: var(--navy);
+    font: 12px/1.58 "SFMono-Regular", Consolas, monospace;
+    text-align: left;
+  }
+  .user-band { margin-bottom: 18px; padding: 10px 12px; border-left: 3px solid var(--oxblood); background: #ddd4ce; }
+  .user-label { margin-bottom: 4px; color: var(--oxblood); font-weight: 700; }
+  .assistant { margin-bottom: 18px; }
+  .assistant h4 { margin: 0 0 5px; color: var(--oxblood); font: 700 13px/1.5 inherit; }
+  .thinking { margin: 0 0 16px; padding-left: 10px; border-left: 1px solid var(--mauve); color: #5f6570; font-style: italic; }
+  .tool { margin: 12px 0 18px; }
+  .tool-head { font-weight: 700; }
+  .ok { color: var(--moss); }
+  .path { color: var(--blue); }
+  .meta { color: #73747a; }
+  .output { margin-top: 5px; padding-left: 10px; border-left: 2px solid var(--mauve); }
+  .role-row { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 10px; margin-bottom: 18px; }
+  .role { padding-top: 1px; color: var(--sage); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+  .role.user { color: var(--oxblood); }
+  .role.agent { color: var(--moss); }
+  .role.thought { color: var(--mauve); }
+  .slab { margin-bottom: 12px; padding: 10px 12px; background: var(--cloud); border: 1px solid #d8cdc7; }
+  .slab-user { border-top: 3px solid var(--oxblood); }
+  .slab-agent { border-top: 3px solid var(--moss); }
+  .slab-thought { background: #e2dcd7; border-top: 2px solid var(--mauve); color: #5f6570; }
+  .card-body p { min-height: 60px; }
+  @media (max-width: 1050px) { .cards { grid-template-columns: 1fr; } .terminal { min-height: 0; } }
+</style>
+
+<h2>How should conversation roles shape the transcript?</h2>
+<p class="subtitle">All options retain the compact tool ledger and edge-only output. Select the hierarchy for user messages, assistant prose, and thinking.</p>
+
+<div class="cards">
+  <div class="card" data-choice="editorial-page" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="terminal">
+        <div class="user-band">
+          <div class="user-label">YOU</div>
+          Refine the terminal interface without losing its compact working rhythm.
+        </div>
+        <div class="thinking">Reviewing the extension boundary and the existing transcript components.</div>
+        <div class="assistant">
+          <h4>Tool presentation</h4>
+          The transcript can gain hierarchy without adopting browser-style cards. Tool state should remain visible at a glance.
+        </div>
+        <div class="tool">
+          <div class="tool-head"><span class="ok">✓</span> read <span class="path">extensions/omp-chatbox.ts</span></div>
+          <div class="output">412 lines returned.<br><span class="meta">ctrl+o expands output</span></div>
+        </div>
+        <div class="assistant">The current extension owns the editor and footer, but Pi owns message and tool rendering.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Editorial page</h3>
+      <p>The user receives one raised band. Assistant prose stays on the page, and thinking becomes a quiet marginal annotation.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="role-gutter" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="terminal">
+        <div class="role-row">
+          <div class="role user">YOU</div>
+          <div>Refine the terminal interface without losing its compact working rhythm.</div>
+        </div>
+        <div class="role-row">
+          <div class="role thought">THINKING</div>
+          <div class="meta">Reviewing the extension boundary and the existing transcript components.</div>
+        </div>
+        <div class="role-row">
+          <div class="role agent">PI</div>
+          <div><strong style="color:var(--oxblood)">Tool presentation</strong><br>The transcript can gain hierarchy without adopting browser-style cards.</div>
+        </div>
+        <div class="role-row">
+          <div class="role">READ ✓</div>
+          <div><span class="path">extensions/omp-chatbox.ts</span><div class="output">412 lines returned.<br><span class="meta">ctrl+o expands output</span></div></div>
+        </div>
+        <div class="role-row">
+          <div class="role agent">PI</div>
+          <div>The current extension owns the editor and footer, but Pi owns message and tool rendering.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Role gutter</h3>
+      <p>A fixed semantic gutter labels every transcript row. The layout is systematic but spends horizontal space at narrow widths.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="message-slabs" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="terminal">
+        <div class="slab slab-user">
+          <div class="user-label">YOU</div>
+          Refine the terminal interface without losing its compact working rhythm.
+        </div>
+        <div class="slab slab-thought">
+          <div class="user-label" style="color:var(--mauve)">THINKING</div>
+          Reviewing the extension boundary and the existing transcript components.
+        </div>
+        <div class="slab slab-agent">
+          <div class="user-label" style="color:var(--moss)">PI</div>
+          <strong style="color:var(--oxblood)">Tool presentation</strong><br>The transcript can gain hierarchy without adopting browser-style cards.
+        </div>
+        <div class="tool">
+          <div class="tool-head"><span class="ok">✓</span> read <span class="path">extensions/omp-chatbox.ts</span></div>
+          <div class="output">412 lines returned.<br><span class="meta">ctrl+o expands output</span></div>
+        </div>
+        <div class="slab slab-agent">The current extension owns the editor and footer, but Pi owns message and tool rendering.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Message slabs</h3>
+      <p>Every conversation role receives a bordered surface. Separation is strong, but the transcript becomes heavier and taller.</p>
+    </div>
+  </div>
+</div>

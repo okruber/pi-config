@@ -1,0 +1,155 @@
+<style>
+  :root {
+    --bone: #e9e3df;
+    --navy: #04162a;
+    --oxblood: #6a3026;
+    --spruce: #1c1e1b;
+    --moss: #3e4739;
+    --mauve: #907062;
+    --cloud: #fbf9f7;
+    --sage: #89897c;
+    --blue: #8894a0;
+    --terra: #a56148;
+  }
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+  .card { display: flex; flex-direction: column; overflow: hidden; }
+  .card-image { padding: 0; background: var(--bone); flex: 1; }
+  .terminal {
+    min-height: 410px;
+    padding: 18px;
+    background: var(--bone);
+    color: var(--navy);
+    font: 12px/1.55 "SFMono-Regular", Consolas, monospace;
+    text-align: left;
+  }
+  .user {
+    margin-bottom: 18px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--oxblood);
+    background: #ddd4ce;
+  }
+  .tool { margin: 11px 0; }
+  .tool-head { color: var(--navy); font-weight: 700; }
+  .muted { color: #5f6570; }
+  .success { color: var(--moss); }
+  .failure { color: var(--oxblood); }
+  .pending { color: var(--terra); }
+  .path { color: #52677d; }
+  .surface { padding: 9px 11px; background: var(--cloud); }
+  .rule { color: var(--mauve); white-space: nowrap; overflow: hidden; }
+  .badge {
+    display: inline-block;
+    min-width: 68px;
+    margin-right: 8px;
+    padding: 1px 7px;
+    color: var(--cloud);
+    font-weight: 700;
+  }
+  .badge.ok { background: var(--moss); }
+  .badge.wait { background: var(--terra); }
+  .badge.fail { background: var(--oxblood); }
+  .diff-add { color: var(--moss); background: #e1e6de; }
+  .diff-del { color: var(--oxblood); background: #efe0dc; }
+  .rail { border-left: 2px solid var(--mauve); padding-left: 12px; }
+  .node { position: relative; }
+  .node::before {
+    content: "◆";
+    position: absolute;
+    left: -18px;
+    top: -1px;
+    color: var(--oxblood);
+    background: var(--bone);
+  }
+  .card-body p { min-height: 44px; }
+  @media (max-width: 1050px) { .cards { grid-template-columns: 1fr; } .terminal { min-height: 0; } }
+</style>
+
+<h2>Which tool-call grammar should define the center column?</h2>
+<p class="subtitle">Each option uses the same Im­eto palette and terminal constraints. Select the structure that should apply to reads, commands, edits, searches, and failures.</p>
+
+<div class="cards">
+  <div class="card" data-choice="inline-ledger" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="terminal">
+        <div class="user">Inspect the theme, run its tests, and correct the invalid token.</div>
+        <div class="tool">
+          <div class="tool-head"><span class="success">✓</span> read <span class="path">themes/imeto-bone.json</span></div>
+          <div class="muted">89 lines returned · ctrl+o to expand</div>
+        </div>
+        <div class="tool">
+          <div class="tool-head"><span class="pending">◌</span> bash <span class="muted">node --test tests/imeto-terminal-ui.test.ts</span></div>
+          <div class="muted">Running for 1.4 s</div>
+        </div>
+        <div class="tool">
+          <div class="tool-head"><span class="failure">×</span> edit <span class="path">themes/imeto-bone.json</span></div>
+          <div class="diff-del">−  "toolTitle": "sageGrey"</div>
+          <div class="diff-add">+  "toolTitle": "deepNavy"</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Inline ledger</h3>
+      <p>Tools stay compact and transcript-like. State comes from symbols, text color, and restrained row backgrounds.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="editorial-blocks" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="terminal">
+        <div class="user">Inspect the theme, run its tests, and correct the invalid token.</div>
+        <div class="tool surface">
+          <div><span class="badge ok">READ ✓</span><span class="path">themes/imeto-bone.json</span></div>
+          <div class="rule">────────────────────────────────</div>
+          <div>89 lines returned.</div>
+          <div class="muted">Collapsed · ctrl+o expands output</div>
+        </div>
+        <div class="tool surface">
+          <div><span class="badge wait">BASH ◌</span><span>node --test …</span></div>
+          <div class="rule">────────────────────────────────</div>
+          <div class="pending">Running for 1.4 s</div>
+        </div>
+        <div class="tool surface">
+          <div><span class="badge fail">EDIT ×</span><span class="path">themes/imeto-bone.json</span></div>
+          <div class="rule">────────────────────────────────</div>
+          <div class="diff-del">−  "toolTitle": "sageGrey"</div>
+          <div class="diff-add">+  "toolTitle": "deepNavy"</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Editorial blocks</h3>
+      <p>Each tool gets a visible header and a raised output surface. Status badges and diff bands carry the hierarchy.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="activity-rail" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="terminal">
+        <div class="user">Inspect the theme, run its tests, and correct the invalid token.</div>
+        <div class="rail">
+          <div class="tool node">
+            <div class="tool-head">Read <span class="path">themes/imeto-bone.json</span></div>
+            <div class="success">Completed with 89 lines.</div>
+          </div>
+          <div class="tool node">
+            <div class="tool-head">Run tests</div>
+            <div class="surface">
+              <div>node --test tests/imeto-terminal-ui.test.ts</div>
+              <div class="pending">◌ Running for 1.4 s</div>
+            </div>
+          </div>
+          <div class="tool node">
+            <div class="tool-head">Edit <span class="path">themes/imeto-bone.json</span></div>
+            <div class="diff-del">−  "toolTitle": "sageGrey"</div>
+            <div class="diff-add">+  "toolTitle": "deepNavy"</div>
+            <div class="failure">Validation failed.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Activity rail</h3>
+      <p>Related tools form one visible execution sequence. The rail emphasizes progress and grouped agent activity.</p>
+    </div>
+  </div>
+</div>

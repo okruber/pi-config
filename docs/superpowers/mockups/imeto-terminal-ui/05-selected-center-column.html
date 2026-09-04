@@ -1,0 +1,150 @@
+<style>
+  :root {
+    --bone: #e9e3df;
+    --navy: #04162a;
+    --oxblood: #6a3026;
+    --spruce: #1c1e1b;
+    --moss: #3e4739;
+    --mauve: #907062;
+    --cloud: #fbf9f7;
+    --sage: #89897c;
+    --blue: #52677d;
+    --terra: #a56148;
+  }
+  .selected-wrap { max-width: 1080px; margin: 0 auto; }
+  .mockup { border-color: #c8bbb4; box-shadow: 0 16px 45px rgba(4, 22, 42, .12); }
+  .mockup-header { display: flex; justify-content: space-between; color: var(--navy); background: #d8cdc7; }
+  .terminal {
+    padding: 24px 26px 20px;
+    background: var(--bone);
+    color: var(--navy);
+    font: 13px/1.58 "SFMono-Regular", Consolas, monospace;
+    text-align: left;
+  }
+  .user-band { margin-bottom: 20px; padding: 11px 13px; border-left: 3px solid var(--oxblood); background: #ddd4ce; }
+  .user-label { margin-bottom: 4px; color: var(--oxblood); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+  .thinking { margin: 0 0 18px; padding-left: 11px; border-left: 1px solid var(--mauve); color: #5f6570; font-style: italic; }
+  .assistant { margin: 0 0 17px; }
+  .assistant h4 { margin: 0 0 5px; color: var(--oxblood); font: 800 14px/1.5 inherit; }
+  .tool { margin: 13px 0 19px; }
+  .tool-head { font-weight: 800; }
+  .ok { color: var(--moss); }
+  .wait { color: var(--terra); }
+  .fail { color: var(--oxblood); }
+  .path { color: var(--blue); }
+  .meta { color: #6b6d71; }
+  .output { margin-top: 5px; padding-left: 11px; border-left: 2px solid var(--mauve); white-space: pre-wrap; }
+  .diff-del { color: var(--oxblood); }
+  .diff-add { color: var(--moss); }
+  .dock { margin-top: 28px; }
+  .powerline { display: flex; overflow: hidden; white-space: nowrap; color: var(--cloud); font-weight: 800; }
+  .segment { padding: 3px 8px; }
+  .seg-red { background: var(--oxblood); }
+  .seg-blue { background: #6f7f90; }
+  .seg-green { background: var(--moss); }
+  .seg-terra { background: var(--terra); }
+  .seg-navy { background: var(--navy); }
+  .editor { min-height: 58px; padding: 10px 12px; background: var(--cloud); border-left: 3px solid var(--oxblood); }
+  .prompt { color: var(--oxblood); font-weight: 800; }
+  .footer { display: flex; justify-content: space-between; padding-top: 5px; color: #73747a; font-size: 12px; }
+  .responsive { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 18px; }
+  .width-demo { padding: 13px; background: var(--spruce); color: var(--cloud); border-radius: 6px; font: 11px/1.5 "SFMono-Regular", Consolas, monospace; overflow: hidden; }
+  .width-label { margin-bottom: 7px; color: #d8cdc7; font-weight: 800; }
+  .mini-line { overflow: hidden; white-space: nowrap; }
+  .mini-editor { margin-top: 5px; padding: 5px 7px; border-left: 2px solid #bd795e; background: #292d29; }
+  .scope-note { margin: 18px 0; padding: 12px 14px; border-left: 3px solid var(--mauve); background: #f3efec; color: var(--navy); }
+  @media (max-width: 850px) { .responsive { grid-template-columns: 1fr; } .terminal { padding: 18px 14px; font-size: 11px; } }
+</style>
+
+<div class="selected-wrap" data-eid="center-column-page">
+  <h2 data-eid="center-column-title">Selected Im­eto center column</h2>
+  <p class="subtitle" data-eid="center-column-subtitle">This composite combines the approved transcript, tool, output, and editor treatments.</p>
+
+  <div class="mockup" data-eid="center-column-mockup">
+    <div class="mockup-header" data-eid="session-masthead"><span>LIVE SESSION · PI</span><span>120 columns</span></div>
+    <div class="terminal">
+      <div class="user-band" data-eid="user-message">
+        <div class="user-label" data-eid="user-label">YOU</div>
+        Inspect the terminal theme, run its contract tests, and correct the tool title token without changing unrelated settings.
+      </div>
+
+      <div class="thinking" data-eid="thinking-annotation">Checking the theme contract and locating the current token before editing.</div>
+
+      <div class="assistant">
+        <h4>Theme verification</h4>
+        I will inspect the theme first, then run the focused test before applying the change.
+      </div>
+
+      <div class="tool">
+        <div class="tool-head"><span class="ok">✓</span> read <span class="path">themes/imeto-bone.json</span></div>
+        <div class="output">89 lines returned.<br><span class="meta">Collapsed · ctrl+o expands output</span></div>
+      </div>
+
+      <div class="tool">
+        <div class="tool-head"><span class="wait">◌</span> bash <span class="meta">node --test tests/imeto-terminal-ui.test.ts</span></div>
+        <div class="output"><span class="wait">Running for 1.4 s</span></div>
+      </div>
+
+      <div class="assistant">The failing assertion confirms that the title uses the muted role instead of the main text role.</div>
+
+      <div class="tool">
+        <div class="tool-head"><span class="ok">✓</span> edit <span class="path">themes/imeto-bone.json</span></div>
+        <div class="output"><span class="diff-del">−  "toolTitle": "sageGrey"</span><br><span class="diff-add">+  "toolTitle": "deepNavy"</span></div>
+        <div class="meta">1 addition and 1 removal</div>
+      </div>
+
+      <div class="tool">
+        <div class="tool-head"><span class="fail">×</span> bash <span class="meta">python3 -m json.tool themes/imeto-bone.json</span></div>
+        <div class="output"><span class="fail">Expected property name on line 31.</span></div>
+      </div>
+
+      <div class="assistant">
+        <h4>Validation result</h4>
+        The visual edit is correct, but the file still contains a JSON syntax error that must be fixed before completion.
+      </div>
+
+      <div class="dock" data-eid="editor-dock">
+        <div class="powerline" data-eid="status-powerline">
+          <span class="segment seg-red">π</span>
+          <span class="segment seg-blue">✺ qwen 3.6</span>
+          <span class="segment seg-green">● high</span>
+          <span class="segment seg-terra">⌘ ~/pi-config:imeto-terminal-ui</span>
+          <span class="segment seg-navy">31%</span>
+        </div>
+        <div class="editor" data-eid="editor-body"><span class="prompt">›</span> Fix the JSON syntax error and rerun validation.</div>
+        <div class="footer" data-eid="editor-footer"><span>esc interrupts · ctrl+o expands · / commands</span><span>1.2k tok/s</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="responsive" data-eid="responsive-examples">
+    <div class="width-demo">
+      <div class="width-label">80 columns</div>
+      <div class="mini-line"><span class="red">π</span> <span class="blue">✺ qwen 3.6</span> <span class="green">● high</span> <span class="terra">⌘ ~/pi-config…</span></div>
+      <div class="mini-editor">› Narrow mode drops context and session fields first.</div>
+    </div>
+    <div class="width-demo">
+      <div class="width-label">120 columns</div>
+      <div class="mini-line"><span class="red">π</span> <span class="blue">✺ qwen 3.6</span> <span class="green">● high</span> <span class="terra">⌘ ~/pi-config:feature</span> <span class="mauve">31%</span></div>
+      <div class="mini-editor">› Standard mode keeps path and context.</div>
+    </div>
+    <div class="width-demo">
+      <div class="width-label">160 columns</div>
+      <div class="mini-line"><span class="red">π</span> <span class="blue">✺ qwen 3.6</span> <span class="green">● high</span> <span class="terra">⌘ ~/pi-config:feature</span> <span class="mauve">31%</span> <span class="sage">$0.42 · named session</span></div>
+      <div class="mini-editor">› Wide mode restores cost and session metadata.</div>
+    </div>
+  </div>
+
+  <div class="scope-note" data-eid="scope-note">Built-in tools receive the compact ledger. Custom and MCP tools retain Pi’s renderer with the same Im­eto theme tokens.</div>
+
+  <div class="options">
+    <div class="option" data-choice="approve-composite" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content"><h3>Approve the composite</h3><p>This becomes the first-pass visual acceptance target.</p></div>
+    </div>
+    <div class="option" data-choice="revise-composite" onclick="toggleSelect(this)">
+      <div class="letter">R</div>
+      <div class="content"><h3>Revise the composite</h3><p>The visual system needs another iteration before architecture is specified.</p></div>
+    </div>
+  </div>
+</div>
