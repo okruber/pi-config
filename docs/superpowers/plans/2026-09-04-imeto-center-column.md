@@ -569,7 +569,7 @@ git commit -m "feat: add imeto transcript hierarchy"
 - Preserves: `name`, `label`, `description`, `parameters`, `promptSnippet`, `promptGuidelines`, `constrainedSampling`, `prepareArguments`, `executionMode`, `execute`, result content, and result details.
 - Changes: only `renderShell`, `renderCall`, and `renderResult`.
 
-- [ ] **Step 1: Add failing factory-option and definition-contract tests**
+- [x] **Step 1: Add failing factory-option and definition-contract tests**
 
 Append these imports and tests to `tests/imeto-transcript.test.ts`.
 
@@ -656,7 +656,7 @@ test('registration covers only Pi built-ins', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests and verify the missing exports**
+- [x] **Step 2: Run the tests and verify the missing exports**
 
 Run:
 
@@ -666,7 +666,7 @@ Run:
 
 Expected: FAIL because `createRuntimeToolDefinitions` and `decorateBuiltInTool` are not exported.
 
-- [ ] **Step 3: Add runtime settings and built-in factories**
+- [x] **Step 3: Add runtime settings and built-in factories**
 
 Extend the imports in `extensions/imeto-transcript.ts`.
 
@@ -723,7 +723,7 @@ export function createRuntimeToolDefinitions(
 
 The factory must not call a settings setter or `flush()`.
 
-- [ ] **Step 4: Implement renderer delegation without changing execution**
+- [x] **Step 4: Implement renderer delegation without changing execution**
 
 Use renderer state to retain Pi's original components across streaming updates.
 
@@ -795,7 +795,7 @@ export function decorateBuiltInTool(definition: AnyToolDefinition): AnyToolDefin
 
 When the built-in edit result renderer updates its call-side preview through shared state, `state.originalCall` must remain the same component instance. Do not replace Pi's original renderer state object with a new object between `renderCall` and `renderResult`.
 
-- [ ] **Step 5: Register the decorated definitions during TUI session start**
+- [x] **Step 5: Register the decorated definitions during TUI session start**
 
 Replace the default export body with one that retains the Markdown transformer and adds TUI-only registration.
 
@@ -817,7 +817,7 @@ export default function (pi: ExtensionAPI) {
 
 Do not call `pi.setActiveTools()`. Registration replaces only same-named built-ins and preserves the current active tool set.
 
-- [ ] **Step 6: Add renderer contract tests for semantic delegation**
+- [x] **Step 6: Add renderer contract tests for semantic delegation**
 
 Append tests that instantiate the decorated `write` and `edit` definitions with a fake theme and render context. Verify these facts:
 
@@ -830,7 +830,7 @@ assert.ok(editLines.filter((line) => /│ [+-](?![+-])/.test(line.replace(/\x1b\
 
 Use a temporary file for the edit preview. Run the original `renderCall`, wait for the asynchronous preview to settle through the supplied `invalidate()` callback, then render again. Verify that the custom ledger does not change `execute`, `parameters`, or `prepareArguments`.
 
-- [ ] **Step 7: Run all automated tests and the extension smoke check**
+- [x] **Step 7: Run all automated tests and the extension smoke check**
 
 Run:
 
@@ -842,7 +842,7 @@ git diff --check
 
 Expected: all tests pass. Pi exits with status `0`. `git diff --check` prints nothing.
 
-- [ ] **Step 8: Commit built-in tool decoration**
+- [x] **Step 8: Commit built-in tool decoration**
 
 ```bash
 git add extensions/imeto-transcript.ts tests/imeto-transcript.test.ts
