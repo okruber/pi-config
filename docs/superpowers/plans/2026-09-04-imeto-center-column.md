@@ -433,7 +433,7 @@ git commit -m "feat: add imeto tool rendering core"
 - Preserves: assistant Markdown without changes.
 - Preserves: persisted messages and model context because Pi applies the transformer only during rendering.
 
-- [ ] **Step 1: Write failing transcript-transform tests**
+- [x] **Step 1: Write failing transcript-transform tests**
 
 Create `tests/imeto-transcript.test.ts` with this initial content.
 
@@ -482,7 +482,7 @@ test('blank and long user content remain valid quoted Markdown', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests and verify the missing export failure**
+- [x] **Step 2: Run the tests and verify the missing export failure**
 
 Run:
 
@@ -492,7 +492,7 @@ Run:
 
 Expected: FAIL because `extensions/imeto-transcript.ts` does not exist.
 
-- [ ] **Step 3: Implement and register the Markdown transformer**
+- [x] **Step 3: Implement and register the Markdown transformer**
 
 Create `extensions/imeto-transcript.ts` with this first implementation.
 
@@ -525,7 +525,7 @@ export default function (pi: ExtensionAPI) {
 
 Do not style assistant prose directly. The active Im­eto theme already maps `mdHeading` to Oxblood, `text` to Deep Navy, `mdQuote` to quiet text, and `mdQuoteBorder` to Mauve Taupe.
 
-- [ ] **Step 4: Run transcript and existing theme tests**
+- [x] **Step 4: Run transcript and existing theme tests**
 
 Run:
 
@@ -535,7 +535,7 @@ Run:
 
 Expected: every current test passes.
 
-- [ ] **Step 5: Smoke-load the transcript extension in non-TUI mode**
+- [x] **Step 5: Smoke-load the transcript extension in non-TUI mode**
 
 Run:
 
@@ -545,7 +545,7 @@ pi --no-extensions -e ./extensions/imeto-transcript.ts -p "reply with ok" >/tmp/
 
 Expected: Pi exits with status `0`. The output contains a model response. No extension load error appears.
 
-- [ ] **Step 6: Commit the transcript hierarchy**
+- [x] **Step 6: Commit the transcript hierarchy**
 
 ```bash
 git add extensions/imeto-transcript.ts tests/imeto-transcript.test.ts
