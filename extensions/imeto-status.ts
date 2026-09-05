@@ -39,3 +39,5 @@ export function fitStatusWidths(leftWidth: number, rightWidth: number, width: nu
   left = Math.max(0, left - overflow)
   return { left, right, gap: Math.max(0, width - left - right) }
 }
+
+export default function () {}

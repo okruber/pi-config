@@ -52,3 +52,5 @@ export function readThemeHex(
   }
   return undefined
 }
+
+export default function () {}

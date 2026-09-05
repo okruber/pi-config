@@ -412,3 +412,5 @@ export class EdgeOutputComponent implements Component {
     this.input.inner?.invalidate()
   }
 }
+
+export default function () {}
