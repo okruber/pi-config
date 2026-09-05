@@ -2,11 +2,8 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
-import { hexToBg, hexToFg, readThemeHex } from "./imeto-style.ts";
-
-const WIDGET_KEY = "token-speed";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { TOKEN_CACHE_STATUS_KEY, TOKEN_RATE_STATUS_KEY } from "./imeto-tool-ui.ts";
 const CHARS_PER_TOKEN = 4;
 const RENDER_INTERVAL_MS = 500;
 // pi-cache-optimizer debounces its disk write by 2s, so a later re-render is
@@ -22,16 +19,8 @@ const SHARDS_DIR = join(
 	"shards",
 );
 
-// Powerline left wedge (U+E0B2), supplied by Symbols Nerd Font as a fallback glyph.
-const CHEVRON = "\uE0B2";
-
-// omp-chatbox.ts republishes ctx.ui.setStatus() values here; its empty footer
-// would otherwise swallow them.
 const STATUS_BRIDGE = Symbol.for("omp.footer.statuses.v1");
 const CACHE_STATUS_KEY = "pi-cache-stats";
-
-type Color = { fg: string; bg?: string };
-type Segment = { label: string; color: Color };
 export type CacheCounters = {
 	day: string;
 	totalRequests: number;
@@ -48,7 +37,6 @@ let sessionHash: string | undefined;
 let statsCache: { signature: string; data: PersistedStats } | undefined;
 
 let currentCtx: ExtensionContext | undefined;
-let currentTui: { requestRender(): void } | undefined;
 let streaming = false;
 let streamStartMs = 0;
 let streamChars = 0;
@@ -58,18 +46,8 @@ function formatRate(rate: number): string {
 	return rate >= 10 ? String(Math.round(rate)) : rate.toFixed(1);
 }
 
-export function rateLabel(isStreaming: boolean, rate: number): string {
-	return ` ${isStreaming ? formatRate(rate) : "0"} tok/s `;
-}
-
-// Named color from the theme's vars, tried in order so palettes that don't use
-// Catppuccin's names still land on something sensible; accent is the last
-// resort. Themes that resolve to a hex value also yield a background form,
-// which the powerline separator needs to sit on the preceding segment.
-export function themeColor(theme: Theme, ...varNames: string[]): Color {
-	const hex = readThemeHex(theme.sourcePath, varNames)
-	if (hex) return { fg: hexToFg(hex), bg: hexToBg(hex) }
-	return { fg: theme.getFgAnsi("accent") };
+export function tokenRateStatusLabel(isStreaming: boolean, rate: number): string {
+	return `${isStreaming ? formatRate(rate) : "0"} tok/s`;
 }
 
 function readCacheStatus(): string | undefined {
@@ -77,17 +55,6 @@ function readCacheStatus(): string | undefined {
 		| { getStatuses?: () => ReadonlyMap<string, string> }
 		| undefined;
 	return bridge?.getStatuses?.().get(CACHE_STATUS_KEY);
-}
-
-// Same shape as pi-cache-optimizer's own formatTokenCount, so the powerline and
-// /cache-optimizer stats never disagree.
-export function formatTokens(value: number): string {
-	const millions = Math.max(0, Math.round(value)) / 1_000_000;
-	if (millions === 0) return "0M";
-	if (millions < 0.001) return `${millions.toFixed(4)}M`;
-	if (millions < 0.01) return `${millions.toFixed(3)}M`;
-	if (millions >= 10) return `${millions.toFixed(1)}M`;
-	return `${millions.toFixed(2)}M`;
 }
 
 function localDay(): string {
@@ -107,13 +74,16 @@ export function hitPercent(counters: CacheCounters): string {
 	return `${((counters.cachedInputTokens / counters.totalInputTokens) * 100).toFixed(1)}%`;
 }
 
-export function sessionLabel(counters: CacheCounters, warned: boolean): string {
-	const tokens = `${formatTokens(counters.cachedInputTokens)}/${formatTokens(counters.totalInputTokens)}`;
-	return ` ${counters.hitRequests}/${counters.totalRequests} · ${tokens} · ${hitPercent(counters)}${warned ? " ⚠️" : ""} `;
-}
-
-export function dayLabel(counters: CacheCounters): string {
-	return ` ${hitPercent(counters)} day `;
+export function cacheStatusLabel(
+	session: CacheCounters | undefined,
+	total: CacheCounters | undefined,
+	warned: boolean,
+): string | undefined {
+	if (!session && !total) return undefined;
+	const parts: string[] = [];
+	if (session) parts.push(`cache ${hitPercent(session)}`);
+	if (total) parts.push(`day ${hitPercent(total)}`);
+	return `${parts.join(" · ")}${warned ? " ⚠" : ""}`;
 }
 
 function addCounters(a: CacheCounters | undefined, b: CacheCounters): CacheCounters {
@@ -187,12 +157,36 @@ function currentRate(): number {
 	return streamChars / CHARS_PER_TOKEN / elapsedSec;
 }
 
+function publishStatuses(ctx: ExtensionContext): void {
+	const model = ctx.model;
+	const modelKey = model ? `${model.provider}/${model.id}` : undefined;
+	let cache: string | undefined;
+	if (modelKey) {
+		const today = localDay();
+		const stats = readStats(today);
+		const session = usableCounters(
+			sessionHash ? stats.sessions?.[sessionHash]?.[modelKey] : undefined,
+			today,
+		);
+		const total = usableCounters(stats.totalsByModel?.[modelKey], today);
+		cache = cacheStatusLabel(session, total, readCacheStatus()?.includes("⚠") ?? false);
+	}
+	ctx.ui.setStatus(TOKEN_CACHE_STATUS_KEY, cache);
+	ctx.ui.setStatus(TOKEN_RATE_STATUS_KEY, tokenRateStatusLabel(streaming, currentRate()));
+}
+
+function publishCurrentStatuses(): void {
+	if (currentCtx) publishStatuses(currentCtx);
+}
+
 function startStreaming(): void {
 	if (streaming) return;
 	streaming = true;
 	streamStartMs = Date.now();
 	streamChars = 0;
-	renderTimer = setInterval(() => currentTui?.requestRender(), RENDER_INTERVAL_MS);
+	renderTimer = setInterval(publishCurrentStatuses, RENDER_INTERVAL_MS);
+	renderTimer.unref?.();
+	publishCurrentStatuses();
 }
 
 function stopStreaming(): void {
@@ -201,120 +195,60 @@ function stopStreaming(): void {
 		clearInterval(renderTimer);
 		renderTimer = undefined;
 	}
-	currentTui?.requestRender();
-}
-
-export function buildSegments(width: number, segments: Segment[]): string[] {
-	const fitted = [...segments];
-	const rowWidth = () => fitted.reduce((sum, seg) => sum + visibleWidth(seg.label) + 1, 0);
-	// Rightmost segment wins the space: drop from the left until the row fits.
-	while (fitted.length > 0 && rowWidth() > width) fitted.shift();
-	if (fitted.length === 0) return [];
-
-	const body = fitted
-		.map(({ label, color }, index) => {
-			// The separator carries the previous segment's color as its background so
-			// the two blocks meet edge to edge. The leftmost one sits on the terminal
-			// background, and a theme without a hex value degrades to that too.
-			const behind = index > 0 ? fitted[index - 1].color.bg : undefined;
-			const chevron = behind
-				? `${behind}${color.fg}${CHEVRON}\x1b[39m\x1b[49m`
-				: `${color.fg}${CHEVRON}\x1b[39m`;
-			// Inverting the label paints the block in the segment color and draws the
-			// letters in the terminal's own background color.
-			return `${chevron}\x1b[7m${color.fg}${label}\x1b[27m\x1b[39m`;
-		})
-		.join("");
-	return [" ".repeat(width - rowWidth()) + body];
-}
-
-function renderRow(width: number, colors: Record<"teal" | "peach" | "yellow", Color>): string[] {
-	if (width < 4) return [];
-
-	const segments: Segment[] = [];
-	const model = currentCtx?.model;
-	const modelKey = model ? `${model.provider}/${model.id}` : undefined;
-
-	if (modelKey) {
-		const today = localDay();
-		const stats = readStats(today);
-		const session = usableCounters(
-			sessionHash ? stats?.sessions?.[sessionHash]?.[modelKey] : undefined,
-			today,
-		);
-		const total = usableCounters(stats?.totalsByModel?.[modelKey], today);
-		if (session) {
-			const warned = readCacheStatus()?.includes("⚠️") ?? false;
-			segments.push({ label: sessionLabel(session, warned), color: colors.peach });
-		}
-		if (total) segments.push({ label: dayLabel(total), color: colors.yellow });
-	}
-
-	segments.push({ label: rateLabel(streaming, currentRate()), color: colors.teal });
-
-	return buildSegments(width, segments);
+	publishCurrentStatuses();
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", (_event, ctx) => {
+		currentCtx = undefined;
+		sessionHash = undefined;
+		stopStreaming();
+		if (ctx.mode !== "tui") return;
 		currentCtx = ctx;
 		const sessionId = ctx.sessionManager.getSessionId();
 		sessionHash = sessionId
 			? createHash("sha256").update(sessionId).digest("hex").slice(0, 16)
 			: undefined;
-		stopStreaming();
-		ctx.ui.setWidget(
-			WIDGET_KEY,
-			(tui) => {
-				currentTui = tui;
-				let colors: Record<"teal" | "peach" | "yellow", Color> | undefined;
-				return {
-					invalidate() {
-						colors = undefined;
-					},
-					dispose() {
-						stopStreaming();
-					},
-					render(width: number): string[] {
-						if (!currentCtx) return [];
-						const theme = currentCtx.ui.theme;
-						if (!colors) {
-							colors = {
-								teal: themeColor(theme, "mossGreen", "teal", "cyan"),
-								peach: themeColor(theme, "oxblood", "peach", "red"),
-								yellow: themeColor(theme, "terracotta", "yellow", "olive"),
-							};
-						}
-						return renderRow(width, colors);
-					},
-				};
-			},
-			{ placement: "belowEditor" },
-		);
+		publishStatuses(ctx);
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
-		stopStreaming();
+		const clearStatuses = currentCtx !== undefined;
 		currentCtx = undefined;
-		ctx.ui.setWidget(WIDGET_KEY, undefined);
+		sessionHash = undefined;
+		stopStreaming();
+		if (!clearStatuses) return;
+		ctx.ui.setStatus(TOKEN_CACHE_STATUS_KEY, undefined);
+		ctx.ui.setStatus(TOKEN_RATE_STATUS_KEY, undefined);
+	});
+
+	pi.on("model_select", (_event, ctx) => {
+		if (ctx.mode !== "tui" || !currentCtx) return;
+		currentCtx = ctx;
+		publishStatuses(ctx);
 	});
 
 	pi.on("message_start", (event) => {
-		if (event.message.role === "assistant") startStreaming();
+		if (currentCtx && event.message.role === "assistant") startStreaming();
 	});
 
 	pi.on("message_update", (event) => {
+		if (!currentCtx) return;
 		const ev = event.assistantMessageEvent;
 		if (ev.type === "text_delta" || ev.type === "thinking_delta" || ev.type === "toolcall_delta") {
 			if (!streaming) startStreaming();
 			streamChars += ev.delta.length;
+			publishCurrentStatuses();
 		}
 	});
 
 	pi.on("message_end", () => {
+		if (!currentCtx) return;
 		stopStreaming();
-		setTimeout(() => currentTui?.requestRender(), STATS_SETTLE_MS).unref?.();
+		setTimeout(publishCurrentStatuses, STATS_SETTLE_MS).unref?.();
 	});
 
-	pi.on("agent_end", () => stopStreaming());
+	pi.on("agent_end", () => {
+		if (currentCtx) stopStreaming();
+	});
 }

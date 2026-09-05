@@ -1,13 +1,23 @@
 import type { Theme } from '@earendil-works/pi-coding-agent'
 import type { Component } from '@earendil-works/pi-tui'
-import { stripTerminalSequences, truncateToWidth } from '@earendil-works/pi-tui'
-import { hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
+import { stripTerminalSequences, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
+import { hexToBg, hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
 
 export const BUILTIN_TOOL_NAMES = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'] as const
 export type BuiltInToolName = (typeof BUILTIN_TOOL_NAMES)[number]
 export type ToolVisualState = 'pending' | 'success' | 'error'
 export type ToolSummary = { action: BuiltInToolName; subject: string }
 export type PreviewSelection = { lines: string[]; omitted: number }
+export type DockFieldId =
+  | 'identity' | 'model' | 'reasoning' | 'path'
+  | 'context' | 'cost' | 'cache' | 'session'
+export type DockRole = DockFieldId
+export type DockField = {
+  id: DockFieldId
+  text: string
+  role: DockRole
+  required: boolean
+}
 
 export const TOKEN_RATE_STATUS_KEY = 'imeto-token-rate'
 export const TOKEN_CACHE_STATUS_KEY = 'imeto-cache-state'
@@ -16,6 +26,19 @@ const ANSI_CLOSE = '\x1b[22m\x1b[27m\x1b[39m\x1b[49m'
 const ANSI_SGR_RE = /\x1b\[([0-9;]*)m/g
 const ANSI_PREFIX_RE = /^((?:\x1b\[[0-?]*[ -/]*[@-~])*) /
 const CHANGED_LINE_RE = /^[+-](?![+-])/
+const POWERLINE_SEPARATOR = '\uE0B0'
+const COMPACT_DOCK_WIDTH = 80
+const DOCK_DROP_ORDER: DockFieldId[] = ['session', 'cache', 'cost', 'context']
+const DOCK_ROLE_VAR: Record<DockRole, keyof typeof IMETO_COLORS> = {
+  identity: 'oxblood',
+  model: 'dustyBlue',
+  reasoning: 'mossGreen',
+  path: 'terracotta',
+  context: 'mauveTaupe',
+  cost: 'deepNavy',
+  cache: 'mossGreen',
+  session: 'sageGrey',
+}
 
 export function toolVisualState(isPartial: boolean, isError: boolean): ToolVisualState {
   if (isPartial) return 'pending'
@@ -64,6 +87,120 @@ export function summarizeToolCall(
 export function fitAnsi(text: string, width: number): string {
   if (width <= 0) return ''
   return `${truncateToWidth(text, width, '')}${ANSI_CLOSE}`
+}
+
+function dockFieldsWidth(fields: readonly DockField[]): number {
+  if (fields.length === 0) return 0
+  return fields.reduce((sum, field) => sum + visibleWidth(field.text) + 2, 0) + fields.length - 1
+}
+
+function removeDockField(fields: DockField[], id: DockFieldId): void {
+  const index = fields.findIndex((field) => field.id === id && !field.required)
+  if (index >= 0) fields.splice(index, 1)
+}
+
+function truncateDockField(fields: DockField[], id: DockFieldId, width: number): void {
+  const field = fields.find((candidate) => candidate.id === id)
+  if (!field) return
+  field.text = stripTerminalSequences(
+    truncateToWidth(stripTerminalSequences(field.text), Math.max(0, width), '…'),
+  )
+}
+
+export function selectDockFields(fields: DockField[], width: number): DockField[] {
+  const selected = fields.map((field) => ({ ...field }))
+
+  if (width <= COMPACT_DOCK_WIDTH) {
+    for (let index = selected.length - 1; index >= 0; index--) {
+      if (!selected[index]!.required) selected.splice(index, 1)
+    }
+  } else {
+    for (const id of DOCK_DROP_ORDER) {
+      if (dockFieldsWidth(selected) <= width) break
+      removeDockField(selected, id)
+    }
+  }
+
+  if (dockFieldsWidth(selected) > width) {
+    const pathIndex = selected.findIndex((field) => field.id === 'path' && !field.required)
+    if (pathIndex >= 0) {
+      const others = selected.filter((_field, index) => index !== pathIndex)
+      const separators = selected.length - 1
+      const available = width - dockFieldsWidth(others) - separators + Math.max(0, others.length - 1) - 2
+      if (available < 4) selected.splice(pathIndex, 1)
+      else truncateDockField(selected, 'path', available)
+    }
+  }
+
+  while (dockFieldsWidth(selected) > width) {
+    const optionalIndex = selected.findLastIndex((field) => !field.required)
+    if (optionalIndex < 0) break
+    selected.splice(optionalIndex, 1)
+  }
+
+  for (const id of ['model', 'reasoning'] as const) {
+    const excess = dockFieldsWidth(selected) - width
+    if (excess <= 0) break
+    const field = selected.find((candidate) => candidate.id === id)
+    if (field) truncateDockField(selected, id, visibleWidth(field.text) - excess)
+  }
+
+  return selected
+}
+
+function dockRoleHex(role: DockRole, sourcePath: string | undefined): string {
+  const variable = DOCK_ROLE_VAR[role]
+  return readThemeHex(sourcePath, [variable]) ?? IMETO_COLORS[variable]
+}
+
+export function renderDock(
+  fields: DockField[],
+  width: number,
+  sourcePath?: string,
+): string {
+  if (width <= 0) return ''
+  const selected = selectDockFields(fields, width)
+  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? IMETO_COLORS.cloudPetal
+  let row = ''
+  for (let index = 0; index < selected.length; index++) {
+    const field = selected[index]!
+    const background = dockRoleHex(field.role, sourcePath)
+    row += `${hexToBg(background)}${hexToFg(cloud)} ${field.text} `
+    const next = selected[index + 1]
+    if (next) {
+      row += `${hexToFg(background)}${hexToBg(dockRoleHex(next.role, sourcePath))}${POWERLINE_SEPARATOR}`
+    }
+  }
+  return fitAnsi(row, width)
+}
+
+function restoreBackground(text: string, background: string): string {
+  return text
+    .replaceAll('\x1b[0m', `\x1b[0m${background}`)
+    .replaceAll('\x1b[49m', `\x1b[49m${background}`)
+}
+
+export function paintEditorBody(line: string, width: number, sourcePath?: string): string {
+  if (width <= 0) return ''
+  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? IMETO_COLORS.cloudPetal
+  const oxblood = readThemeHex(sourcePath, ['oxblood']) ?? IMETO_COLORS.oxblood
+  const background = hexToBg(cloud)
+  const contentWidth = Math.max(0, width - 2)
+  const content = restoreBackground(truncateToWidth(line, contentWidth, ''), background)
+  const padding = ' '.repeat(Math.max(0, contentWidth - visibleWidth(content)))
+  const prefix = `${hexToFg(oxblood)}│\x1b[39m `
+  return fitAnsi(`${prefix}${background}${content}${padding}${ANSI_CLOSE}`, width)
+}
+
+export function renderQuietFooter(
+  hint: string,
+  rate: string | undefined,
+  width: number,
+): string {
+  if (width <= 0) return ''
+  const right = rate ?? ''
+  const gap = Math.max(1, width - visibleWidth(hint) - visibleWidth(right))
+  return fitAnsi(`${hint}${' '.repeat(gap)}${right}`, width)
 }
 
 export function stripBackgroundAnsi(text: string): string {

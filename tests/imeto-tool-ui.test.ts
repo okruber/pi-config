@@ -5,11 +5,16 @@ import {
   EdgeOutputComponent,
   ToolLedgerComponent,
   fitAnsi,
+  paintEditorBody,
+  renderDock,
+  renderQuietFooter,
+  selectDockFields,
   selectPreviewLines,
   stripBackgroundAnsi,
   summarizeToolCall,
   toolStateSymbol,
   toolVisualState,
+  type DockField,
 } from '../extensions/imeto-tool-ui.ts'
 
 const theme = {
@@ -17,6 +22,83 @@ const theme = {
   fg: (_name: string, text: string) => text,
   bold: (text: string) => `\x1b[1m${text}\x1b[22m`,
 } as any
+
+const dockFields: DockField[] = [
+  { id: 'identity', text: 'π', role: 'identity', required: true },
+  { id: 'model', text: '✺ claude-opus-5', role: 'model', required: true },
+  { id: 'reasoning', text: '● high', role: 'reasoning', required: true },
+  { id: 'path', text: '⌘ ~/a/very/long/project/path:imeto-terminal-ui', role: 'path', required: false },
+  { id: 'context', text: '31%/200k', role: 'context', required: false },
+  { id: 'cost', text: '$0.420', role: 'cost', required: false },
+  { id: 'cache', text: 'cache 96.1% · day 94.2%', role: 'cache', required: false },
+  { id: 'session', text: 'imeto visual acceptance', role: 'session', required: false },
+]
+
+test('dock fields degrade in semantic priority order', () => {
+  assert.deepEqual(selectDockFields(dockFields, 160).map((field) => field.id), [
+    'identity', 'model', 'reasoning', 'path', 'context', 'cost', 'cache', 'session',
+  ])
+  const standard = selectDockFields(dockFields, 120).map((field) => field.id)
+  assert.ok(standard.includes('path'))
+  assert.ok(standard.includes('context'))
+  assert.ok(!standard.includes('session'))
+  assert.deepEqual(selectDockFields(dockFields, 80).map((field) => field.id), [
+    'identity', 'model', 'reasoning',
+  ])
+})
+
+test('dock, editor body, and quiet footer respect every supplied width', () => {
+  for (const width of [1, 20, 40, 80, 120, 160]) {
+    const rows = [
+      renderDock(dockFields, width),
+      paintEditorBody('editor content that is intentionally long', width),
+      renderQuietFooter('esc interrupts · ctrl+o expands · / commands', '12 tok/s', width),
+    ]
+    for (const row of rows) assert.ok(visibleWidth(row) <= width)
+    if (width > 0) assert.match(rows[0]!, /\x1b\[22m\x1b\[27m\x1b\[39m\x1b\[49m$/)
+  }
+})
+
+test('editor body restores Cloud Petal after cursor and truncation resets', () => {
+  const row = paintEditorBody(`before\x1b[0m${'after'.repeat(20)}`, 40)
+  assert.match(row, /\x1b\[0m\x1b\[48;2;251;249;247mafter/)
+  assert.equal(row.match(/\x1b\[0m\x1b\[48;2;251;249;247m/g)?.length, 2)
+  assert.match(row, /\x1b\[49m$/)
+})
+
+test('dock selection truncates paths before required fields', () => {
+  const fields: DockField[] = [
+    ...dockFields.slice(0, 3),
+    {
+      id: 'path',
+      text: `⌘ ~/${'deep/'.repeat(30)}project`,
+      role: 'path',
+      required: false,
+    },
+  ]
+  const selected = selectDockFields(fields, 100)
+  assert.deepEqual(selected.map((field) => field.id), [
+    'identity', 'model', 'reasoning', 'path',
+  ])
+  assert.match(selected.at(-1)!.text, /…$/)
+
+  const required = selectDockFields(dockFields.slice(0, 3), 20)
+  assert.deepEqual(required.map((field) => field.id), ['identity', 'model', 'reasoning'])
+  assert.match(required[1]!.text, /…$/)
+  assert.equal(required[2]!.text, '● high')
+})
+
+test('dock selection never mutates caller fields', () => {
+  const snapshot = structuredClone(dockFields)
+  selectDockFields(dockFields, 40)
+  assert.deepEqual(dockFields, snapshot)
+})
+
+test('dock uses truecolor segments and powerline separators', () => {
+  const row = renderDock(dockFields.slice(0, 3), 80)
+  assert.match(row, /^\x1b\[48;2;106;48;38m\x1b\[38;2;251;249;247m π /)
+  assert.equal(stripTerminalSequences(row).split('\uE0B0').length - 1, 2)
+})
 
 test('tool states use the approved symbols', () => {
   assert.equal(toolStateSymbol(toolVisualState(true, false)), '◌')

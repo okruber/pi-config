@@ -3,6 +3,11 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { stripTerminalSequences, visibleWidth } from '@earendil-works/pi-tui'
+import {
+  loadThemeFromPath,
+  setThemeInstance,
+} from '../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js'
 import {
   IMETO_COLORS,
   hexToBg,
@@ -15,6 +20,22 @@ import {
   statusHex,
   statusText,
 } from '../extensions/imeto-status.ts'
+import {
+  TOKEN_CACHE_STATUS_KEY,
+  TOKEN_RATE_STATUS_KEY,
+} from '../extensions/imeto-tool-ui.ts'
+import ompChatboxExtension, {
+  contextDockRole,
+  partitionEditorRows,
+} from '../extensions/omp-chatbox.ts'
+import tokenSpeedExtension, {
+  cacheStatusLabel,
+  tokenRateStatusLabel,
+  type CacheCounters,
+} from '../extensions/token-speed.ts'
+
+const piThemePath = new URL('../themes/imeto-bone.json', import.meta.url).pathname
+setThemeInstance(loadThemeFromPath(piThemePath, 'truecolor'))
 
 const EXPECTED = {
   oxblood: '#6a3026',
@@ -117,9 +138,186 @@ test('status widths fit wide and narrow terminals', () => {
   assert.deepEqual(fitStatusWidths(12, 0, 20), { left: 12, right: 0, gap: 8 })
 })
 
-test('token-speed prefers semantic Imeto variables', () => {
+test('dock context colors preserve pressure thresholds', () => {
+  const role = (percent: number | null) => contextDockRole({
+    getContextUsage: () => ({ percent }),
+  } as any)
+  assert.equal(role(null), 'session')
+  assert.equal(role(69.9), 'context')
+  assert.equal(role(70), 'path')
+  assert.equal(role(90), 'identity')
+})
+
+test('editor row partition removes only Pi borders', () => {
+  assert.deepEqual(partitionEditorRows([
+    '────────', 'first   ', 'second  ', '────────', 'choice  ',
+  ], 8), {
+    editorRows: ['first   ', 'second  '],
+    autocompleteRows: ['choice  '],
+  })
+  assert.deepEqual(partitionEditorRows([
+    '─── ↑ 2 more ', 'body         ', '─── ↓ 3 more ',
+  ], 13), {
+    editorRows: ['body         '],
+    autocompleteRows: [],
+  })
+})
+
+test('chatbox renders dock, raised editor rows, and quiet footer', () => {
+  const handlers = new Map<string, (...args: any[]) => void>()
+  let footerFactory: ((...args: any[]) => any) | undefined
+  let editorFactory: ((...args: any[]) => any) | undefined
+  const pi = {
+    on(name: string, handler: (...args: any[]) => void) {
+      handlers.set(name, handler)
+    },
+    exec: async () => ({ stdout: 'feature\n' }),
+    getThinkingLevel: () => 'high',
+  }
+  ompChatboxExtension(pi as any)
+  const statuses = new Map([
+    [TOKEN_CACHE_STATUS_KEY, 'cache 96.1%'],
+    [TOKEN_RATE_STATUS_KEY, '12 tok/s'],
+  ])
+  const theme = {
+    sourcePath: undefined,
+    fg: (_name: string, text: string) => text,
+  }
+  const ctx = {
+    mode: 'tui',
+    cwd: '/repo',
+    model: { provider: 'test', id: 'model', name: 'Claude', contextWindow: 200000 },
+    modelRegistry: { isUsingOAuth: () => false },
+    getContextUsage: () => ({ percent: 31, tokens: 62000, contextWindow: 200000 }),
+    sessionManager: {
+      getEntries: () => [],
+      getSessionName: () => 'acceptance',
+    },
+    ui: {
+      theme,
+      setFooter(factory: typeof footerFactory) {
+        footerFactory = factory
+      },
+      setEditorComponent(factory: typeof editorFactory) {
+        editorFactory = factory
+      },
+    },
+  }
+
+  handlers.get('session_start')?.({}, ctx)
+  assert.ok(footerFactory)
+  assert.ok(editorFactory)
+  const tui = { terminal: { rows: 40 }, requestRender: () => undefined }
+  const footer = footerFactory(tui, theme, {
+    getExtensionStatuses: () => statuses,
+  })
+  assert.deepEqual(footer.render(80), [])
+  const editor = editorFactory(tui, {
+    borderColor: (text: string) => text,
+    selectList: {},
+  }, { matches: () => false })
+  editor.setText('first line\nsecond line')
+  const rows = editor.render(80)
+  const plain = rows.map(stripTerminalSequences)
+  assert.match(plain[0]!, /π.*✺ Claude.*● high/)
+  assert.ok(plain.some((line) => /^│ first line/.test(line)))
+  assert.ok(plain.some((line) => /esc.*interrupts.*12 tok\/s/.test(line)))
+  assert.ok(!plain.some((line) => /^─+$/.test(line)))
+  for (const row of rows) assert.ok(visibleWidth(row) <= 80)
+  handlers.get('session_shutdown')?.({}, ctx)
+})
+
+test('token-speed publishes dock statuses without a second powerline widget', () => {
   const source = readFileSync(new URL('../extensions/token-speed.ts', import.meta.url), 'utf8')
-  assert.match(source, /themeColor\(theme, "mossGreen", "teal", "cyan"\)/)
-  assert.match(source, /themeColor\(theme, "oxblood", "peach", "red"\)/)
-  assert.match(source, /themeColor\(theme, "terracotta", "yellow", "olive"\)/)
+  assert.match(source, /TOKEN_CACHE_STATUS_KEY/)
+  assert.match(source, /TOKEN_RATE_STATUS_KEY/)
+  assert.match(source, /ctx\.ui\.setStatus/)
+  assert.doesNotMatch(source, /ctx\.ui\.setWidget/)
+})
+
+test('cache and token-rate status labels are plain and compact', () => {
+  const session: CacheCounters = {
+    day: '2026-09-05',
+    totalRequests: 4,
+    hitRequests: 3,
+    cachedInputTokens: 961,
+    totalInputTokens: 1000,
+  }
+  const total: CacheCounters = {
+    ...session,
+    cachedInputTokens: 942,
+  }
+  assert.equal(cacheStatusLabel(session, total, false), 'cache 96.1% · day 94.2%')
+  assert.equal(cacheStatusLabel(session, undefined, true), 'cache 96.1% ⚠')
+  assert.equal(cacheStatusLabel(undefined, undefined, false), undefined)
+  assert.equal(tokenRateStatusLabel(false, 12.4), '0 tok/s')
+  assert.equal(tokenRateStatusLabel(true, 12.4), '12 tok/s')
+})
+
+test('token-speed refreshes and clears both dock statuses', () => {
+  const handlers = new Map<string, (...args: any[]) => void>()
+  const statusCalls: Array<[string, string | undefined]> = []
+  tokenSpeedExtension({
+    on(name: string, handler: (...args: any[]) => void) {
+      handlers.set(name, handler)
+    },
+  } as any)
+  const ctx = {
+    mode: 'tui',
+    model: undefined,
+    sessionManager: { getSessionId: () => 'session-id' },
+    ui: {
+      setStatus(key: string, value: string | undefined) {
+        statusCalls.push([key, value])
+      },
+    },
+  }
+
+  try {
+    handlers.get('session_start')?.({}, ctx)
+    handlers.get('message_start')?.({ message: { role: 'assistant' } }, ctx)
+    handlers.get('message_update')?.({
+      assistantMessageEvent: { type: 'text_delta', delta: 'streaming text' },
+    }, ctx)
+    const beforeModelSelect = statusCalls.length
+    handlers.get('model_select')?.({}, ctx)
+    assert.ok(statusCalls.length > beforeModelSelect)
+    handlers.get('message_end')?.({}, ctx)
+    for (const [, value] of statusCalls) {
+      if (value !== undefined) assert.ok(!value.includes('\x1b'))
+    }
+  } finally {
+    handlers.get('session_shutdown')?.({}, ctx)
+  }
+
+  assert.deepEqual(statusCalls.slice(-2), [
+    [TOKEN_CACHE_STATUS_KEY, undefined],
+    [TOKEN_RATE_STATUS_KEY, undefined],
+  ])
+})
+
+test('token-speed performs no terminal setup outside TUI mode', () => {
+  const handlers = new Map<string, (...args: any[]) => void>()
+  tokenSpeedExtension({
+    on(name: string, handler: (...args: any[]) => void) {
+      handlers.set(name, handler)
+    },
+  } as any)
+  let statusCalls = 0
+  const ctx = {
+    mode: 'print',
+    model: undefined,
+    sessionManager: { getSessionId: () => 'print-session' },
+    ui: { setStatus: () => { statusCalls += 1 } },
+  }
+  handlers.get('session_start')?.({}, ctx)
+  handlers.get('message_start')?.({ message: { role: 'assistant' } }, ctx)
+  handlers.get('message_update')?.({
+    assistantMessageEvent: { type: 'text_delta', delta: 'text' },
+  }, ctx)
+  handlers.get('model_select')?.({}, ctx)
+  handlers.get('message_end')?.({}, ctx)
+  handlers.get('agent_end')?.({}, ctx)
+  handlers.get('session_shutdown')?.({}, ctx)
+  assert.equal(statusCalls, 0)
 })

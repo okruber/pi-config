@@ -1,18 +1,25 @@
 import {
   CustomEditor,
+  keyHint,
+  rawKeyHint,
   type ExtensionAPI,
   type ExtensionContext,
   type KeybindingsManager,
 } from '@earendil-works/pi-coding-agent'
 import type { Component, EditorTheme, TUI } from '@earendil-works/pi-tui'
-import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
-import { contextRole, fitStatusWidths, statusText, type StatusRole } from './imeto-status.ts'
+import { stripTerminalSequences, visibleWidth } from '@earendil-works/pi-tui'
+import { contextRole } from './imeto-status.ts'
+import {
+  TOKEN_CACHE_STATUS_KEY,
+  TOKEN_RATE_STATUS_KEY,
+  fitAnsi,
+  paintEditorBody,
+  renderDock,
+  renderQuietFooter,
+  type DockField,
+  type DockRole,
+} from './imeto-tool-ui.ts'
 
-const SEP = '›'
-const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]/g
-
-// ctx.ui.setStatus() values are reachable only through a setFooter callback.
-// This footer draws nothing, so it republishes them for the belowEditor widgets.
 const STATUS_BRIDGE = Symbol.for('omp.footer.statuses.v1')
 
 type StatusBridge = { version: 1; getStatuses(): ReadonlyMap<string, string> }
@@ -21,6 +28,7 @@ class EmptyFooter implements Component {
   render(): string[] {
     return []
   }
+
   invalidate(): void {}
 }
 
@@ -47,14 +55,20 @@ function formatTokens(count: number): string {
   return `${Math.round(count / 1000000)}M`
 }
 
-type StatusTheme = ExtensionContext['ui']['theme']
-
 function formatContext(ctx: ExtensionContext): string {
   const usage = ctx.getContextUsage()
   const window = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0
   if (!window) return 'ctx ?'
   if (!usage || usage.percent === null || usage.tokens === null) return `?/${formatTokens(window)}`
   return `${usage.percent.toFixed(1)}%/${formatTokens(window)}`
+}
+
+export function contextDockRole(ctx: Pick<ExtensionContext, 'getContextUsage'>): DockRole {
+  const role = contextRole(ctx.getContextUsage()?.percent ?? null)
+  if (role === 'danger') return 'identity'
+  if (role === 'path') return 'path'
+  if (role === 'muted') return 'session'
+  return 'context'
 }
 
 function totalCost(ctx: ExtensionContext): number {
@@ -77,62 +91,93 @@ function modelLabel(ctx: ExtensionContext): string {
 function subscriptionLabel(ctx: ExtensionContext): string | undefined {
   const provider = ctx.model?.provider
   if (!provider) return undefined
-
   const envKeyBase = provider.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()
-  const envLabel = process.env[`PI_${envKeyBase}_EMAIL`] || process.env[`PI_${envKeyBase}_LABEL`]
-  return envLabel?.trim() || undefined
-}
-
-function vivid(theme: StatusTheme, role: StatusRole, text: string, bold = true): string {
-  return statusText(role, text, bold, theme.sourcePath)
-}
-function pad(text: string): string {
-  return ` ${text} `
-}
-
-function strong(theme: StatusTheme, color: string, text: string): string {
-  return theme.fg(color as any, theme.bold(text))
-}
-
-function quiet(theme: StatusTheme, color: string, text: string): string {
-  return theme.fg(color as any, text)
-}
-
-function contextSegment(ctx: ExtensionContext): string {
-  const text = formatContext(ctx)
-  const percent = ctx.getContextUsage()?.percent ?? null
-  return vivid(ctx.ui.theme, contextRole(percent), text, percent !== null)
-}
-
-function fitStatusLine(left: string, right: string, width: number, border: (text: string) => string): string {
-  if (width <= 0) return ''
-
-  const fitted = fitStatusWidths(visibleWidth(left), visibleWidth(right), width)
-  const leftText = truncateToWidth(left, fitted.left, '')
-  const rightText = truncateToWidth(right, fitted.right, '')
-  return leftText + border('─'.repeat(fitted.gap)) + rightText
-}
-
-function stripAnsi(text: string): string {
-  return text.replace(ANSI_RE, '')
+  const label = process.env[`PI_${envKeyBase}_EMAIL`] || process.env[`PI_${envKeyBase}_LABEL`]
+  return label?.trim() || undefined
 }
 
 function isEditorBorderLine(line: string, width: number): boolean {
-  const plain = stripAnsi(line)
-  return (
-    visibleWidth(line) === width &&
-    (/^─+$/.test(plain) || /^─── [↑↓] \d+ more ─*$/.test(plain))
+  const plain = stripTerminalSequences(line)
+  return visibleWidth(line) === width && (
+    /^─+$/.test(plain) || /^─── [↑↓] \d+ more ─*$/.test(plain)
   )
 }
 
-function removeBottomEditorBorder(lines: string[], width: number): number {
-  for (let i = lines.length - 1; i >= 1; i--) {
-    if (isEditorBorderLine(lines[i], width)) {
-      lines.splice(i, 1)
-      return i
+export function partitionEditorRows(
+  lines: string[],
+  width: number,
+): { editorRows: string[]; autocompleteRows: string[] } {
+  let bottomIndex = -1
+  for (let index = lines.length - 1; index >= 1; index--) {
+    if (isEditorBorderLine(lines[index]!, width)) {
+      bottomIndex = index
+      break
     }
   }
-  return lines.length
+  if (bottomIndex < 0) {
+    return { editorRows: lines.slice(1), autocompleteRows: [] }
+  }
+  return {
+    editorRows: lines.slice(1, bottomIndex),
+    autocompleteRows: lines.slice(bottomIndex + 1),
+  }
+}
+
+function currentStatuses(): ReadonlyMap<string, string> {
+  const bridge = (globalThis as Record<symbol, unknown>)[STATUS_BRIDGE] as StatusBridge | undefined
+  return bridge?.getStatuses() ?? new Map<string, string>()
+}
+
+function dockFields(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  branch: string | undefined,
+  statuses: ReadonlyMap<string, string>,
+): DockField[] {
+  const thinking = typeof (pi as any).getThinkingLevel === 'function'
+    ? (pi as any).getThinkingLevel()
+    : 'off'
+  const cost = totalCost(ctx)
+  const usingSubscription = ctx.model
+    ? (ctx.modelRegistry as any).isUsingOAuth?.(ctx.model) === true
+    : false
+  const fields: DockField[] = [
+    { id: 'identity', text: 'π', role: 'identity', required: true },
+    { id: 'model', text: `✺ ${modelLabel(ctx)}`, role: 'model', required: true },
+    { id: 'reasoning', text: `● ${thinking}`, role: 'reasoning', required: true },
+    {
+      id: 'path',
+      text: `⌘ ${compactPath(ctx.cwd)}${branch ? `:${branch}` : ''}`,
+      role: 'path',
+      required: false,
+    },
+    {
+      id: 'context',
+      text: formatContext(ctx),
+      role: contextDockRole(ctx),
+      required: false,
+    },
+  ]
+
+  if (cost > 0 || usingSubscription) {
+    const subscription = usingSubscription ? subscriptionLabel(ctx) : undefined
+    fields.push({
+      id: 'cost',
+      text: usingSubscription
+        ? `sub${subscription ? `: ${subscription}` : ''}`
+        : `$${cost.toFixed(cost >= 10 ? 2 : 3)}`,
+      role: 'cost',
+      required: false,
+    })
+  }
+
+  const cache = statuses.get(TOKEN_CACHE_STATUS_KEY)
+  if (cache) fields.push({ id: 'cache', text: cache, role: 'cache', required: false })
+  const sessionName = ctx.sessionManager.getSessionName()
+  if (sessionName) {
+    fields.push({ id: 'session', text: sessionName, role: 'session', required: false })
+  }
+  return fields
 }
 
 export default function (pi: ExtensionAPI) {
@@ -141,10 +186,12 @@ export default function (pi: ExtensionAPI) {
 
   pi.on('session_shutdown', () => {
     activeTui = undefined
+    delete (globalThis as Record<symbol, unknown>)[STATUS_BRIDGE]
   })
 
   pi.on('session_start', (_event, ctx) => {
     if (ctx.mode !== 'tui') return
+    branch = undefined
     ctx.ui.setFooter((_tui, _theme, footerData) => {
       const bridge: StatusBridge = {
         version: 1,
@@ -168,68 +215,38 @@ export default function (pi: ExtensionAPI) {
         activeTui = tui
       }
 
-      // Pi copies the default editor's padding into custom editors after
-      // construction. Keep our OMP-style inset under our custom left border.
+      // Pi reapplies default editor padding after construction.
       setPaddingX(): void {}
 
       render(width: number): string[] {
-        const leftBorderWidth = 2
-        const innerWidth = Math.max(1, width - leftBorderWidth)
-        const lines = super.render(innerWidth)
-        if (lines.length < 2) return lines
+        if (width <= 0) return []
+        const innerWidth = Math.max(1, width - 2)
+        const rendered = super.render(innerWidth)
+        const { editorRows, autocompleteRows } = partitionEditorRows(rendered, innerWidth)
+        const statuses = currentStatuses()
+        const fields = dockFields(pi, ctx, branch, statuses)
+        const hint = ctx.ui.theme.fg('dim', [
+          rawKeyHint('esc', 'interrupts'),
+          keyHint('app.tools.expand', 'expands'),
+          rawKeyHint('/', 'commands'),
+        ].join(' · '))
+        const rate = statuses.get(TOKEN_RATE_STATUS_KEY)
 
-        const theme = ctx.ui.theme
-        const border = (text: string) => this.borderColor(text)
-        const sep = theme.fg('borderMuted', ` ${SEP} `)
-        const thinking = typeof (pi as any).getThinkingLevel === 'function' ? (pi as any).getThinkingLevel() : 'off'
-        const cost = totalCost(ctx)
-        const usingSub = ctx.model ? (ctx.modelRegistry as any).isUsingOAuth?.(ctx.model) : false
-
-        const parts = [
-          pad(vivid(theme, 'identity', 'π')),
-          pad(`${vivid(theme, 'model', '✺')} ${vivid(theme, 'model', modelLabel(ctx))}`),
-          pad(vivid(theme, 'reasoning', `● ${thinking === 'off' ? 'off' : thinking}`)),
-          pad(
-            `${quiet(theme, 'dim', '⌘')} ${vivid(theme, 'path', compactPath(ctx.cwd))}${
-              branch ? quiet(theme, 'muted', `:${branch}`) : ''
-            }`,
+        return [
+          renderDock(fields, width, ctx.ui.theme.sourcePath),
+          ...editorRows.map((line) => paintEditorBody(line, width, ctx.ui.theme.sourcePath)),
+          renderQuietFooter(
+            hint,
+            rate ? ctx.ui.theme.fg('dim', rate) : undefined,
+            width,
           ),
-          pad(contextSegment(ctx)),
+          ...autocompleteRows.map((line) => fitAnsi(`  ${line}`, width)),
         ]
-
-        if (cost > 0 || usingSub) {
-          const label = usingSub ? subscriptionLabel(ctx) : undefined
-          const subSuffix = usingSub ? ` (sub${label ? `: ${label}` : ''})` : ''
-          parts.push(
-            pad(
-              `${strong(theme, 'customMessageLabel', `$${cost.toFixed(cost >= 10 ? 2 : 3)}`)}${
-                subSuffix ? quiet(theme, 'dim', subSuffix) : ''
-              }`,
-            ),
-          )
-        }
-
-        const left = parts.join(sep)
-        const sessionName = ctx.sessionManager.getSessionName()
-        const right = sessionName ? pad(strong(theme, 'accent', sessionName)) : ''
-
-        lines[0] = border('╭─') + fitStatusLine(left, right, innerWidth, border)
-        const removedBottomIndex = removeBottomEditorBorder(lines, innerWidth)
-        const lastEditorContentLine = Math.max(1, removedBottomIndex - 1)
-
-        for (let i = 1; i < lines.length; i++) {
-          const isEditorContent = i <= lastEditorContentLine
-          const isBottomLeft = i === lastEditorContentLine
-          const prefix = isEditorContent
-            ? border(isBottomLeft ? '╰' : '│') + ' '
-            : '  '
-          lines[i] = prefix + lines[i]
-        }
-
-        return lines
       }
     }
 
-    ctx.ui.setEditorComponent((tui, theme, keybindings) => new OmpChatboxEditor(tui, theme, keybindings))
+    ctx.ui.setEditorComponent(
+      (tui, theme, keybindings) => new OmpChatboxEditor(tui, theme, keybindings),
+    )
   })
 }

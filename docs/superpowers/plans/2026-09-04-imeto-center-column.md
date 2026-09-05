@@ -869,7 +869,7 @@ git commit -m "feat: decorate pi built-in tool rendering"
 - Consumes: footer statuses through `Symbol.for('omp.footer.statuses.v1')`.
 - Preserves: `StatusBridge.version: 1`, cache shard aggregation, streaming-rate calculation, branch refresh, context thresholds, editor input handling, and Pi keybindings.
 
-- [ ] **Step 1: Add failing responsive dock tests**
+- [x] **Step 1: Add failing responsive dock tests**
 
 Append these imports and tests to `tests/imeto-tool-ui.test.ts`.
 
@@ -925,7 +925,7 @@ test('editor body restores Cloud Petal after cursor resets', () => {
 })
 ```
 
-- [ ] **Step 2: Replace the obsolete token-speed source contract**
+- [x] **Step 2: Replace the obsolete token-speed source contract**
 
 In `tests/imeto-terminal-ui.test.ts`, replace `token-speed prefers semantic Im­eto variables` with this test.
 
@@ -939,7 +939,7 @@ test('token-speed publishes dock statuses without a second powerline widget', ()
 })
 ```
 
-- [ ] **Step 3: Run the tests and verify missing dock exports**
+- [x] **Step 3: Run the tests and verify missing dock exports**
 
 Run:
 
@@ -949,7 +949,7 @@ Run:
 
 Expected: FAIL because the dock functions are not exported. The token-speed source contract also fails because it still registers a widget.
 
-- [ ] **Step 4: Implement responsive field selection and ANSI-safe dock rows**
+- [x] **Step 4: Implement responsive field selection and ANSI-safe dock rows**
 
 Add these types to `extensions/imeto-tool-ui.ts`.
 
@@ -1014,7 +1014,7 @@ export function renderQuietFooter(
 }
 ```
 
-- [ ] **Step 5: Publish cache and token rate through footer statuses**
+- [x] **Step 5: Publish cache and token rate through footer statuses**
 
 Modify `extensions/token-speed.ts` to import `TOKEN_CACHE_STATUS_KEY` and `TOKEN_RATE_STATUS_KEY` from `imeto-tool-ui.ts`.
 
@@ -1062,7 +1062,7 @@ function publishStatuses(ctx: ExtensionContext): void {
 
 Call `publishStatuses(ctx)` on `session_start`, each render timer tick, each `message_update`, `message_end`, and `agent_end`. Clear both statuses on `session_shutdown`. Do not register a widget.
 
-- [ ] **Step 6: Replace the border ledger with the approved dock**
+- [x] **Step 6: Replace the border ledger with the approved dock**
 
 Modify `extensions/omp-chatbox.ts` to import the dock helpers and status keys.
 
@@ -1125,7 +1125,7 @@ return [
 
 Keep `setPaddingX(): void {}` because Pi copies the default editor padding into custom editors after construction. Keep `super.handleInput()` unchanged through `CustomEditor` inheritance.
 
-- [ ] **Step 7: Run dock, status, and smoke verification**
+- [x] **Step 7: Run dock, status, and smoke verification**
 
 Run:
 
@@ -1141,7 +1141,7 @@ git diff --check
 
 Expected: all tests pass. Pi exits with status `0`. The source contract confirms that `token-speed.ts` does not call `ctx.ui.setWidget()`.
 
-- [ ] **Step 8: Verify the bridge and status cleanup mechanically**
+- [x] **Step 8: Verify the bridge and status cleanup mechanically**
 
 Run:
 
@@ -1153,7 +1153,7 @@ rg "TOKEN_CACHE_STATUS_KEY|TOKEN_RATE_STATUS_KEY|setStatus" extensions/token-spe
 
 Expected: the first command prints the unchanged bridge symbol and version. The second command prints publication and cleanup sites. The third command exits with status `0` and prints nothing.
 
-- [ ] **Step 9: Commit the powerline dock**
+- [x] **Step 9: Commit the powerline dock**
 
 ```bash
 git add \
