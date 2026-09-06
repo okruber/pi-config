@@ -28,8 +28,6 @@ export type TranscriptTransformContext = {
   themeSourcePath?: string
 }
 
-const ANSI_BOLD = '\x1b[1m'
-const ANSI_BOLD_OFF = '\x1b[22m'
 const ANSI_ITALIC_OFF = '\x1b[23m'
 const ANSI_FG_OFF = '\x1b[39m'
 
@@ -37,16 +35,9 @@ function quoteMarkdown(markdown: string): string {
   return markdown.split('\n').map((line) => `> ${line}`).join('\n')
 }
 
-function themeHex(sourcePath: string | undefined, name: 'oxblood' | 'deepNavy'): string {
-  return readThemeHex(sourcePath, [name]) ?? IMETO_COLORS[name]
-}
-
-function userLabel(sourcePath: string | undefined): string {
-  return `${ANSI_ITALIC_OFF}${hexToFg(themeHex(sourcePath, 'oxblood'))}${ANSI_BOLD}YOU${ANSI_BOLD_OFF}${ANSI_FG_OFF}`
-}
-
 function userBody(markdown: string, sourcePath: string | undefined): string {
-  const prefix = `${ANSI_ITALIC_OFF}${hexToFg(themeHex(sourcePath, 'deepNavy'))}`
+  const color = readThemeHex(sourcePath, ['deepNavy']) ?? IMETO_COLORS.deepNavy
+  const prefix = `${ANSI_ITALIC_OFF}${hexToFg(color)}`
   return markdown.split('\n').map((line) => `> ${prefix}${line}${ANSI_FG_OFF}`).join('\n')
 }
 
@@ -56,7 +47,7 @@ export function transformTranscriptMarkdown(
 ): string {
   if (context.messageType === 'assistant') return markdown
   if (context.messageType === 'assistant-thinking') return quoteMarkdown(markdown)
-  return `> ${userLabel(context.themeSourcePath)}\n>\n${userBody(markdown, context.themeSourcePath)}`
+  return userBody(markdown, context.themeSourcePath)
 }
 
 type AnyToolDefinition = ToolDefinition<any, any, any>

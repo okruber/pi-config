@@ -133,14 +133,14 @@ test('non-semantic built-in call renderers are not invoked or retained', () => {
   }
 })
 
-test('user Markdown receives the YOU label and quoted structural edge', () => {
+test('user Markdown starts with its content inside the quoted structural edge', () => {
   const transformed = transformTranscriptMarkdown('Inspect `theme.json`.\n\nKeep the diff small.', {
     ...baseContext,
     messageType: 'user',
   })
   assert.equal(
     stripTerminalSequences(transformed),
-    '> YOU\n>\n> Inspect `theme.json`.\n> \n> Keep the diff small.',
+    '> Inspect `theme.json`.\n> \n> Keep the diff small.',
   )
 })
 
@@ -175,12 +175,12 @@ test('blank and long user content remain valid quoted Markdown', () => {
     messageType: 'user',
     availableWidth: 40,
   }))
-  assert.ok(transformed.startsWith('> YOU\n>\n> first\n> \n> long'))
+  assert.ok(transformed.startsWith('> first\n> \n> long'))
   assert.equal(stripTerminalSequences(transformTranscriptMarkdown('', {
     ...baseContext,
     messageType: 'user',
     availableWidth: 40,
-  })), '> YOU\n>\n> ')
+  })), '> ')
 })
 
 test('missing theme data uses exact Im­eto transcript fallbacks', () => {
@@ -190,11 +190,11 @@ test('missing theme data uses exact Im­eto transcript fallbacks', () => {
     availableWidth: 80,
     themeSourcePath: '/missing/imeto-theme.json',
   })
-  assert.ok(transformed.includes(hexToFg(IMETO_COLORS.oxblood)))
+  assert.ok(!transformed.includes(hexToFg(IMETO_COLORS.oxblood)))
   assert.ok(transformed.includes(hexToFg(IMETO_COLORS.deepNavy)))
 })
 
-test('extension wiring follows live TUI themes and clears them for other lifecycles', () => {
+test('extension wiring follows live TUI body colors and clears them for other lifecycles', () => {
   const directory = mkdtempSync(join(tmpdir(), 'imeto-transcript-'))
   try {
     const firstPath = join(directory, 'first.json')
@@ -231,16 +231,16 @@ test('extension wiring follows live TUI themes and clears them for other lifecyc
     const transform = () => transformer!('Body', {
       messageType: 'user', isStreaming: false, availableWidth: 80,
     })
-    assert.ok(transform().includes(hexToFg('#010203')))
+    assert.ok(transform().includes(hexToFg('#040506')))
     theme.sourcePath = secondPath
-    assert.ok(transform().includes(hexToFg('#111213')))
+    assert.ok(transform().includes(hexToFg('#141516')))
 
     handlers.get('session_start')?.({}, { mode: 'print' })
-    assert.ok(transform().includes(hexToFg(IMETO_COLORS.oxblood)))
+    assert.ok(transform().includes(hexToFg(IMETO_COLORS.deepNavy)))
 
     handlers.get('session_start')?.({}, tuiContext)
     handlers.get('session_shutdown')?.()
-    assert.ok(transform().includes(hexToFg(IMETO_COLORS.oxblood)))
+    assert.ok(transform().includes(hexToFg(IMETO_COLORS.deepNavy)))
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -459,20 +459,17 @@ test('edit decoration retains asynchronous preview state and source indentation'
   }
 })
 
-test('Pi renders the user label and body with distinct upright Im­eto roles', () => {
+test('Pi renders user content without a title and keeps the upright Im­eto body role', () => {
   const transformer = (markdown: string, context: any) => transformTranscriptMarkdown(markdown, {
     ...context,
     themeSourcePath: themePath,
   })
   const component = new UserMessageComponent('Inspect `theme.json`.', undefined, 1, [transformer])
   const lines = component.render(60)
-  const label = lines.find((line) => stripTerminalSequences(line).includes('YOU'))
   const body = lines.find((line) => stripTerminalSequences(line).includes('Inspect'))
-  assert.ok(label)
+  assert.ok(!lines.some((line) => /^│ YOU\s*$/.test(stripTerminalSequences(line).trimStart())))
   assert.ok(body)
-  assert.match(label, new RegExp(`\\x1b\\[23m${escapeRegExp(hexToFg(IMETO_COLORS.oxblood))}\\x1b\\[1mYOU`))
   assert.match(body, new RegExp(`\\x1b\\[23m${escapeRegExp(hexToFg(IMETO_COLORS.deepNavy))}Inspect`))
-  assert.match(stripTerminalSequences(label), /│ YOU/)
   assert.match(stripTerminalSequences(body), /│ Inspect theme\.json\./)
 })
 
