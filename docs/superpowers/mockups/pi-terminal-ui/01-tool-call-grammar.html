@@ -65,7 +65,7 @@
 </style>
 
 <h2>Which tool-call grammar should define the center column?</h2>
-<p class="subtitle">Each option uses the same Im­eto palette and terminal constraints. Select the structure that should apply to reads, commands, edits, searches, and failures.</p>
+<p class="subtitle">Each option uses the same Pi Terminal UI palette and terminal constraints. Select the structure that should apply to reads, commands, edits, searches, and failures.</p>
 
 <div class="cards">
   <div class="card" data-choice="inline-ledger" onclick="toggleSelect(this)">
@@ -73,15 +73,15 @@
       <div class="terminal">
         <div class="user">Inspect the theme, run its tests, and correct the invalid token.</div>
         <div class="tool">
-          <div class="tool-head"><span class="success">✓</span> read <span class="path">themes/imeto-bone.json</span></div>
+          <div class="tool-head"><span class="success">✓</span> read <span class="path">themes/bone.json</span></div>
           <div class="muted">89 lines returned · ctrl+o to expand</div>
         </div>
         <div class="tool">
-          <div class="tool-head"><span class="pending">◌</span> bash <span class="muted">node --test tests/imeto-terminal-ui.test.ts</span></div>
+          <div class="tool-head"><span class="pending">◌</span> bash <span class="muted">node --test tests/pi-terminal-ui.test.ts</span></div>
           <div class="muted">Running for 1.4 s</div>
         </div>
         <div class="tool">
-          <div class="tool-head"><span class="failure">×</span> edit <span class="path">themes/imeto-bone.json</span></div>
+          <div class="tool-head"><span class="failure">×</span> edit <span class="path">themes/bone.json</span></div>
           <div class="diff-del">−  "toolTitle": "sageGrey"</div>
           <div class="diff-add">+  "toolTitle": "deepNavy"</div>
         </div>
@@ -98,7 +98,7 @@
       <div class="terminal">
         <div class="user">Inspect the theme, run its tests, and correct the invalid token.</div>
         <div class="tool surface">
-          <div><span class="badge ok">READ ✓</span><span class="path">themes/imeto-bone.json</span></div>
+          <div><span class="badge ok">READ ✓</span><span class="path">themes/bone.json</span></div>
           <div class="rule">────────────────────────────────</div>
           <div>89 lines returned.</div>
           <div class="muted">Collapsed · ctrl+o expands output</div>
@@ -109,7 +109,7 @@
           <div class="pending">Running for 1.4 s</div>
         </div>
         <div class="tool surface">
-          <div><span class="badge fail">EDIT ×</span><span class="path">themes/imeto-bone.json</span></div>
+          <div><span class="badge fail">EDIT ×</span><span class="path">themes/bone.json</span></div>
           <div class="rule">────────────────────────────────</div>
           <div class="diff-del">−  "toolTitle": "sageGrey"</div>
           <div class="diff-add">+  "toolTitle": "deepNavy"</div>
@@ -128,18 +128,18 @@
         <div class="user">Inspect the theme, run its tests, and correct the invalid token.</div>
         <div class="rail">
           <div class="tool node">
-            <div class="tool-head">Read <span class="path">themes/imeto-bone.json</span></div>
+            <div class="tool-head">Read <span class="path">themes/bone.json</span></div>
             <div class="success">Completed with 89 lines.</div>
           </div>
           <div class="tool node">
             <div class="tool-head">Run tests</div>
             <div class="surface">
-              <div>node --test tests/imeto-terminal-ui.test.ts</div>
+              <div>node --test tests/pi-terminal-ui.test.ts</div>
               <div class="pending">◌ Running for 1.4 s</div>
             </div>
           </div>
           <div class="tool node">
-            <div class="tool-head">Edit <span class="path">themes/imeto-bone.json</span></div>
+            <div class="tool-head">Edit <span class="path">themes/bone.json</span></div>
             <div class="diff-del">−  "toolTitle": "sageGrey"</div>
             <div class="diff-add">+  "toolTitle": "deepNavy"</div>
             <div class="failure">Validation failed.</div>

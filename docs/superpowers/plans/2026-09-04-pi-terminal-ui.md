@@ -1,14 +1,14 @@
-# Im­eto Terminal UI Implementation Plan
+# Pi Terminal UI Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship the Bone Editorial visual profile as a terminal-native Pi theme and restyle the existing OMP editor status surfaces with Im­eto colors.
+**Goal:** Ship the Bone Editorial visual profile as a terminal-native Pi theme and restyle the existing OMP editor status surfaces with Pi Terminal UI colors.
 
-**Architecture:** A shared dependency-free module owns the sampled Im­eto palette and theme-file lookup. Pi consumes the palette through a complete theme JSON, while Orca consumes a paired Warp-format terminal YAML. Existing chatbox and token-speed extensions keep their behavior and replace only their color policy.
+**Architecture:** A shared dependency-free module owns the sampled Pi Terminal UI palette and theme-file lookup. Pi consumes the palette through a complete theme JSON, while Orca consumes a paired Warp-format terminal YAML. Existing chatbox and token-speed extensions keep their behavior and replace only their color policy.
 
 **Tech Stack:** Pi theme JSON, Warp-compatible terminal YAML, TypeScript extensions, Node.js `node:test`, 24-bit ANSI color.
 
-**Spec:** `docs/superpowers/specs/2026-09-04-imeto-terminal-ui-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-04-pi-terminal-ui-design.md`
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - The first stage stays inside `okruber/pi-config`.
 - The first stage does not add a persistent left rail or right context pane.
 - The first stage does not create a Pi core fork.
-- The implementation uses the sampled Im­eto colors exactly.
+- The implementation uses the sampled Pi Terminal UI colors exactly.
 - Every rendered line must respect the width supplied by Pi.
 - `Symbol.for('omp.footer.statuses.v1')` and its version remain unchanged.
 - The custom editor continues to extend `CustomEditor` and delegate input handling to Pi.
@@ -30,12 +30,12 @@
 ### Task 1: Shared palette and test harness
 
 **Files:**
-- Create: `extensions/imeto-style.ts`
-- Create: `tests/imeto-terminal-ui.test.ts`
+- Create: `extensions/pi-terminal-ui-style.ts`
+- Create: `tests/pi-terminal-ui.test.ts`
 
 **Interfaces:**
-- Produces: `IMETO_COLORS`, a readonly map of palette names to six-digit hex strings.
-- Produces: `ImetoColorName`, the key union for `IMETO_COLORS`.
+- Produces: `TERMINAL_UI_COLORS`, a readonly map of palette names to six-digit hex strings.
+- Produces: `TerminalUiColorName`, the key union for `TERMINAL_UI_COLORS`.
 - Produces: `hexToFg(hex: string): string`.
 - Produces: `hexToBg(hex: string): string`.
 - Produces: `readThemeHex(sourcePath: string | undefined, names: readonly string[]): string | undefined`.
@@ -43,7 +43,7 @@
 
 - [ ] **Step 1: Write the failing palette tests**
 
-Create `tests/imeto-terminal-ui.test.ts` with the imports and tests below.
+Create `tests/pi-terminal-ui.test.ts` with the imports and tests below.
 
 ```ts
 import assert from 'node:assert/strict'
@@ -52,11 +52,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
-  IMETO_COLORS,
+  TERMINAL_UI_COLORS,
   hexToBg,
   hexToFg,
   readThemeHex,
-} from '../extensions/imeto-style.ts'
+} from '../extensions/pi-terminal-ui-style.ts'
 
 const EXPECTED = {
   oxblood: '#6a3026',
@@ -71,8 +71,8 @@ const EXPECTED = {
   terracotta: '#a56148',
 } as const
 
-test('sampled Im­eto palette remains exact', () => {
-  assert.deepEqual(IMETO_COLORS, EXPECTED)
+test('sampled Pi Terminal UI palette remains exact', () => {
+  assert.deepEqual(TERMINAL_UI_COLORS, EXPECTED)
 })
 
 test('hex helpers emit truecolor ANSI sequences', () => {
@@ -81,7 +81,7 @@ test('hex helpers emit truecolor ANSI sequences', () => {
 })
 
 test('theme lookup uses the first matching valid hex value', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'imeto-theme-'))
+  const dir = mkdtempSync(join(tmpdir(), 'pi-terminal-ui-theme-'))
   const sourcePath = join(dir, 'theme.json')
   writeFileSync(sourcePath, JSON.stringify({ vars: { accent: '#123456', fallback: 'invalid' } }))
   assert.equal(readThemeHex(sourcePath, ['missing', 'accent']), '#123456')
@@ -100,19 +100,19 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
+node --test tests/pi-terminal-ui.test.ts
 ```
 
-Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `extensions/imeto-style.ts`.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `extensions/pi-terminal-ui-style.ts`.
 
 - [ ] **Step 3: Implement the dependency-free palette module**
 
-Create `extensions/imeto-style.ts` with the following implementation.
+Create `extensions/pi-terminal-ui-style.ts` with the following implementation.
 
 ```ts
 import { readFileSync } from 'node:fs'
 
-export const IMETO_COLORS = {
+export const TERMINAL_UI_COLORS = {
   oxblood: '#6a3026',
   bone: '#e9e3df',
   darkSpruce: '#1c1e1b',
@@ -125,7 +125,7 @@ export const IMETO_COLORS = {
   terracotta: '#a56148',
 } as const
 
-export type ImetoColorName = keyof typeof IMETO_COLORS
+export type TerminalUiColorName = keyof typeof TERMINAL_UI_COLORS
 
 function rgb(hex: string): [number, number, number] {
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) throw new Error(`Invalid RGB hex: ${hex}`)
@@ -172,7 +172,7 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
+node --test tests/pi-terminal-ui.test.ts
 ```
 
 Expected: 4 tests pass.
@@ -181,8 +181,8 @@ Expected: 4 tests pass.
 
 ```bash
 cd ~/Documents/Personal/pi-config
-git add extensions/imeto-style.ts tests/imeto-terminal-ui.test.ts
-git commit -m "test: define imeto terminal palette"
+git add extensions/pi-terminal-ui-style.ts tests/pi-terminal-ui.test.ts
+git commit -m "test: define pi-terminal-ui terminal palette"
 ```
 
 ---
@@ -190,18 +190,18 @@ git commit -m "test: define imeto terminal palette"
 ### Task 2: Pi and Orca theme pair
 
 **Files:**
-- Create: `themes/imeto-bone.json`
-- Create: `themes/imeto-bone.terminal.yaml`
-- Modify: `tests/imeto-terminal-ui.test.ts`
+- Create: `themes/bone.json`
+- Create: `themes/bone.terminal.yaml`
+- Modify: `tests/pi-terminal-ui.test.ts`
 
 **Interfaces:**
-- Consumes: `IMETO_COLORS` from `extensions/imeto-style.ts` as the canonical sampled palette.
-- Produces: Pi theme named `imeto-bone`.
-- Produces: Orca terminal theme named `Imeto Bone`.
+- Consumes: `TERMINAL_UI_COLORS` from `extensions/pi-terminal-ui-style.ts` as the canonical sampled palette.
+- Produces: Pi theme named `bone`.
+- Produces: Orca terminal theme named `Bone`.
 
 - [ ] **Step 1: Add failing theme-contract tests**
 
-Append these constants and tests to `tests/imeto-terminal-ui.test.ts`. Add `readFileSync` to the existing `node:fs` import.
+Append these constants and tests to `tests/pi-terminal-ui.test.ts`. Add `readFileSync` to the existing `node:fs` import.
 
 ```ts
 const REQUIRED_THEME_TOKENS = [
@@ -219,15 +219,15 @@ const REQUIRED_THEME_TOKENS = [
 ] as const
 
 test('Pi theme defines every required token and exact brand variables', () => {
-  const theme = JSON.parse(readFileSync(new URL('../themes/imeto-bone.json', import.meta.url), 'utf8'))
-  assert.equal(theme.name, 'imeto-bone')
-  for (const [name, hex] of Object.entries(IMETO_COLORS)) assert.equal(theme.vars[name], hex)
+  const theme = JSON.parse(readFileSync(new URL('../themes/bone.json', import.meta.url), 'utf8'))
+  assert.equal(theme.name, 'bone')
+  for (const [name, hex] of Object.entries(TERMINAL_UI_COLORS)) assert.equal(theme.vars[name], hex)
   for (const token of REQUIRED_THEME_TOKENS) assert.equal(typeof theme.colors[token], 'string', token)
 })
 
 test('terminal theme pairs Bone background with Deep Navy foreground', () => {
-  const yaml = readFileSync(new URL('../themes/imeto-bone.terminal.yaml', import.meta.url), 'utf8')
-  assert.match(yaml, /^name: Imeto Bone$/m)
+  const yaml = readFileSync(new URL('../themes/bone.terminal.yaml', import.meta.url), 'utf8')
+  assert.match(yaml, /^name: Bone$/m)
   assert.match(yaml, /^background: "#e9e3df"$/m)
   assert.match(yaml, /^foreground: "#04162a"$/m)
   assert.match(yaml, /^selection: "#907062"$/m)
@@ -240,19 +240,19 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
+node --test tests/pi-terminal-ui.test.ts
 ```
 
-Expected: FAIL with `ENOENT` for `themes/imeto-bone.json`.
+Expected: FAIL with `ENOENT` for `themes/bone.json`.
 
 - [ ] **Step 3: Create the complete Pi theme**
 
-Create `themes/imeto-bone.json`. Use this variable block and token mapping.
+Create `themes/bone.json`. Use this variable block and token mapping.
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
-  "name": "imeto-bone",
+  "name": "bone",
   "vars": {
     "oxblood": "#6a3026",
     "bone": "#e9e3df",
@@ -343,13 +343,13 @@ Create `themes/imeto-bone.json`. Use this variable block and token mapping.
 
 - [ ] **Step 4: Create the Orca terminal companion**
 
-Create `themes/imeto-bone.terminal.yaml` with this content.
+Create `themes/bone.terminal.yaml` with this content.
 
 ```yaml
-# Terminal companion to imeto-bone.json. Pi cannot paint the terminal
+# Terminal companion to bone.json. Pi cannot paint the terminal
 # background, so the Bone ground comes from the terminal itself.
 # Warp-format YAML, which is what Orca's "Import from YAML" reads.
-name: Imeto Bone
+name: Bone
 details: lighter
 background: "#e9e3df"
 foreground: "#04162a"
@@ -386,8 +386,8 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
-python3 -m json.tool themes/imeto-bone.json >/dev/null
+node --test tests/pi-terminal-ui.test.ts
+python3 -m json.tool themes/bone.json >/dev/null
 ```
 
 Expected: 6 tests pass. The JSON parser exits with status 0.
@@ -396,21 +396,21 @@ Expected: 6 tests pass. The JSON parser exits with status 0.
 
 ```bash
 cd ~/Documents/Personal/pi-config
-git add themes/imeto-bone.json themes/imeto-bone.terminal.yaml tests/imeto-terminal-ui.test.ts
-git commit -m "feat: add imeto bone theme pair"
+git add themes/bone.json themes/bone.terminal.yaml tests/pi-terminal-ui.test.ts
+git commit -m "feat: add pi-terminal-ui bone theme pair"
 ```
 
 ---
 
-### Task 3: Im­eto chatbox status treatment
+### Task 3: Pi Terminal UI chatbox status treatment
 
 **Files:**
-- Create: `extensions/imeto-status.ts`
+- Create: `extensions/pi-terminal-ui-status.ts`
 - Modify: `extensions/omp-chatbox.ts`
-- Modify: `tests/imeto-terminal-ui.test.ts`
+- Modify: `tests/pi-terminal-ui.test.ts`
 
 **Interfaces:**
-- Consumes: `IMETO_COLORS`, `hexToFg`, and `readThemeHex` from `extensions/imeto-style.ts`.
+- Consumes: `TERMINAL_UI_COLORS`, `hexToFg`, and `readThemeHex` from `extensions/pi-terminal-ui-style.ts`.
 - Produces: `StatusRole`, the semantic color roles used by the editor status line.
 - Produces: `statusHex(role: StatusRole, sourcePath?: string): string`.
 - Produces: `statusText(role: StatusRole, text: string, bold?: boolean, sourcePath?: string): string`.
@@ -420,7 +420,7 @@ git commit -m "feat: add imeto bone theme pair"
 
 - [ ] **Step 1: Add failing semantic-status tests**
 
-Append the import and tests below to `tests/imeto-terminal-ui.test.ts`.
+Append the import and tests below to `tests/pi-terminal-ui.test.ts`.
 
 ```ts
 import {
@@ -428,23 +428,23 @@ import {
   fitStatusWidths,
   statusHex,
   statusText,
-} from '../extensions/imeto-status.ts'
+} from '../extensions/pi-terminal-ui-status.ts'
 
-test('status roles map to the approved Im­eto palette', () => {
-  assert.equal(statusHex('identity'), IMETO_COLORS.oxblood)
-  assert.equal(statusHex('model'), IMETO_COLORS.dustyBlue)
-  assert.equal(statusHex('reasoning'), IMETO_COLORS.mossGreen)
-  assert.equal(statusHex('path'), IMETO_COLORS.terracotta)
-  assert.equal(statusHex('context'), IMETO_COLORS.mauveTaupe)
-  assert.equal(statusHex('danger'), IMETO_COLORS.oxblood)
+test('status roles map to the approved Pi Terminal UI palette', () => {
+  assert.equal(statusHex('identity'), TERMINAL_UI_COLORS.oxblood)
+  assert.equal(statusHex('model'), TERMINAL_UI_COLORS.dustyBlue)
+  assert.equal(statusHex('reasoning'), TERMINAL_UI_COLORS.mossGreen)
+  assert.equal(statusHex('path'), TERMINAL_UI_COLORS.terracotta)
+  assert.equal(statusHex('context'), TERMINAL_UI_COLORS.mauveTaupe)
+  assert.equal(statusHex('danger'), TERMINAL_UI_COLORS.oxblood)
 })
 
 test('status roles honor matching variables from the active theme', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'imeto-status-'))
+  const dir = mkdtempSync(join(tmpdir(), 'pi-terminal-ui-status-'))
   const sourcePath = join(dir, 'theme.json')
   writeFileSync(sourcePath, JSON.stringify({ vars: { oxblood: '#123456' } }))
   assert.equal(statusHex('identity', sourcePath), '#123456')
-  assert.equal(statusHex('model', sourcePath), IMETO_COLORS.dustyBlue)
+  assert.equal(statusHex('model', sourcePath), TERMINAL_UI_COLORS.dustyBlue)
 })
 
 test('context pressure selects neutral, warning, and danger roles', () => {
@@ -474,17 +474,17 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
+node --test tests/pi-terminal-ui.test.ts
 ```
 
-Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `extensions/imeto-status.ts`.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `extensions/pi-terminal-ui-status.ts`.
 
 - [ ] **Step 3: Implement semantic status roles and width fitting**
 
-Create `extensions/imeto-status.ts` with this implementation.
+Create `extensions/pi-terminal-ui-status.ts` with this implementation.
 
 ```ts
-import { hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
+import { hexToFg, TERMINAL_UI_COLORS, readThemeHex } from './pi-terminal-ui-style.ts'
 
 export type StatusRole =
   | 'identity'
@@ -498,13 +498,13 @@ export type StatusRole =
 export type StatusWidths = { left: number; right: number; gap: number }
 
 const STATUS_HEX: Record<StatusRole, string> = {
-  identity: IMETO_COLORS.oxblood,
-  model: IMETO_COLORS.dustyBlue,
-  reasoning: IMETO_COLORS.mossGreen,
-  path: IMETO_COLORS.terracotta,
-  context: IMETO_COLORS.mauveTaupe,
-  muted: IMETO_COLORS.sageGrey,
-  danger: IMETO_COLORS.oxblood,
+  identity: TERMINAL_UI_COLORS.oxblood,
+  model: TERMINAL_UI_COLORS.dustyBlue,
+  reasoning: TERMINAL_UI_COLORS.mossGreen,
+  path: TERMINAL_UI_COLORS.terracotta,
+  context: TERMINAL_UI_COLORS.mauveTaupe,
+  muted: TERMINAL_UI_COLORS.sageGrey,
+  danger: TERMINAL_UI_COLORS.oxblood,
 }
 
 const STATUS_VAR: Record<StatusRole, string> = {
@@ -564,7 +564,7 @@ import {
   fitStatusWidths,
   statusText,
   type StatusRole,
-} from './imeto-status.ts'
+} from './pi-terminal-ui-status.ts'
 ```
 
 Delete `RAINBOW`, `sgrFg()`, and the old `vivid()`. Add this theme-aware wrapper.
@@ -631,11 +631,11 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
-pi --no-extensions -e ./extensions/omp-chatbox.ts -p "reply with ok" >/tmp/imeto-chatbox-smoke.txt
+node --test tests/pi-terminal-ui.test.ts
+pi --no-extensions -e ./extensions/omp-chatbox.ts -p "reply with ok" >/tmp/pi-terminal-ui-chatbox-smoke.txt
 ```
 
-Expected: 11 tests pass. Pi exits with status 0. `/tmp/imeto-chatbox-smoke.txt` contains a model response and no extension load error.
+Expected: 11 tests pass. Pi exits with status 0. `/tmp/pi-terminal-ui-chatbox-smoke.txt` contains a model response and no extension load error.
 
 - [ ] **Step 6: Verify the status bridge and removed rainbow mechanically**
 
@@ -653,29 +653,29 @@ Expected: the first command prints the bridge symbol and version. The second com
 
 ```bash
 cd ~/Documents/Personal/pi-config
-git add extensions/imeto-status.ts extensions/omp-chatbox.ts tests/imeto-terminal-ui.test.ts
-git commit -m "feat: restyle pi chatbox with imeto colors"
+git add extensions/pi-terminal-ui-status.ts extensions/omp-chatbox.ts tests/pi-terminal-ui.test.ts
+git commit -m "feat: restyle pi chatbox with pi-terminal-ui colors"
 ```
 
 ---
 
-### Task 4: Im­eto token-speed powerline
+### Task 4: Pi Terminal UI token-speed powerline
 
 **Files:**
 - Modify: `extensions/token-speed.ts`
-- Modify: `tests/imeto-terminal-ui.test.ts`
+- Modify: `tests/pi-terminal-ui.test.ts`
 
 **Interfaces:**
-- Consumes: `hexToBg`, `hexToFg`, and `readThemeHex` from `extensions/imeto-style.ts`.
+- Consumes: `hexToBg`, `hexToFg`, and `readThemeHex` from `extensions/pi-terminal-ui-style.ts`.
 - Preserves: `themeColor(theme: Theme, ...varNames: string[]): Color`.
 - Preserves: cache shard aggregation, token-rate calculation, status bridge lookup, and Powerline layout.
 
-- [ ] **Step 1: Add a failing source contract for the preferred Im­eto roles**
+- [ ] **Step 1: Add a failing source contract for the preferred Pi Terminal UI roles**
 
-Append this test to `tests/imeto-terminal-ui.test.ts`.
+Append this test to `tests/pi-terminal-ui.test.ts`.
 
 ```ts
-test('token-speed prefers semantic Im­eto variables', () => {
+test('token-speed prefers semantic Pi Terminal UI variables', () => {
   const source = readFileSync(new URL('../extensions/token-speed.ts', import.meta.url), 'utf8')
   assert.match(source, /themeColor\(theme, "mossGreen", "teal", "cyan"\)/)
   assert.match(source, /themeColor\(theme, "oxblood", "peach", "red"\)/)
@@ -689,10 +689,10 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
+node --test tests/pi-terminal-ui.test.ts
 ```
 
-Expected: FAIL in `token-speed prefers semantic Im­eto variables`.
+Expected: FAIL in `token-speed prefers semantic Pi Terminal UI variables`.
 
 - [ ] **Step 3: Reuse the shared theme-file reader**
 
@@ -705,7 +705,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { hexToBg, hexToFg, readThemeHex } from "./imeto-style.ts";
+import { hexToBg, hexToFg, readThemeHex } from "./pi-terminal-ui-style.ts";
 ```
 
 Replace `themeColor()` with the version below.
@@ -720,7 +720,7 @@ export function themeColor(theme: Theme, ...varNames: string[]): Color {
 
 This removes the duplicated theme JSON parsing while retaining the existing fallback.
 
-- [ ] **Step 4: Prefer Im­eto variables when creating Powerline colors**
+- [ ] **Step 4: Prefer Pi Terminal UI variables when creating Powerline colors**
 
 Replace the lazy color initialization inside the widget renderer.
 
@@ -740,18 +740,18 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
-pi --no-extensions -e ./extensions/omp-chatbox.ts -e ./extensions/token-speed.ts -p "reply with ok" >/tmp/imeto-ui-smoke.txt
+node --test tests/pi-terminal-ui.test.ts
+pi --no-extensions -e ./extensions/omp-chatbox.ts -e ./extensions/token-speed.ts -p "reply with ok" >/tmp/pi-terminal-ui-ui-smoke.txt
 ```
 
-Expected: 12 tests pass. Pi exits with status 0. `/tmp/imeto-ui-smoke.txt` contains a model response and no extension load error.
+Expected: 12 tests pass. Pi exits with status 0. `/tmp/pi-terminal-ui-ui-smoke.txt` contains a model response and no extension load error.
 
 - [ ] **Step 6: Commit the Powerline treatment**
 
 ```bash
 cd ~/Documents/Personal/pi-config
-git add extensions/token-speed.ts tests/imeto-terminal-ui.test.ts
-git commit -m "feat: align token status with imeto palette"
+git add extensions/token-speed.ts tests/pi-terminal-ui.test.ts
+git commit -m "feat: align token status with pi-terminal-ui palette"
 ```
 
 ---
@@ -763,7 +763,7 @@ git commit -m "feat: align token status with imeto palette"
 - Modify and partially stage: `settings.json`
 
 **Interfaces:**
-- Consumes: Pi theme `imeto-bone` and Orca terminal theme `Imeto Bone`.
+- Consumes: Pi theme `bone` and Orca terminal theme `Bone`.
 - Produces: Persistent Pi theme selection and documented activation steps.
 
 - [ ] **Step 1: Add activation documentation**
@@ -771,12 +771,12 @@ git commit -m "feat: align token status with imeto palette"
 Append this section to `README.md`.
 
 ```md
-## Im­eto terminal UI
+## Pi terminal UI
 
 The Pi theme and terminal-emulator theme must be used together.
 
-1. Import `themes/imeto-bone.terminal.yaml` into Orca as a custom terminal theme.
-2. Select `Imeto Bone` for the Orca terminal.
+1. Import `themes/bone.terminal.yaml` into Orca as a custom terminal theme.
+2. Select `Bone` for the Orca terminal.
 3. Run `/reload` in Pi.
 
 The terminal supplies the Bone background. Pi supplies message, tool, Markdown,
@@ -790,9 +790,9 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-node --test tests/imeto-terminal-ui.test.ts
-python3 -m json.tool themes/imeto-bone.json >/dev/null
-pi --no-extensions -e ./extensions/omp-chatbox.ts -e ./extensions/token-speed.ts -p "reply with ok" >/tmp/imeto-ui-final-smoke.txt
+node --test tests/pi-terminal-ui.test.ts
+python3 -m json.tool themes/bone.json >/dev/null
+pi --no-extensions -e ./extensions/omp-chatbox.ts -e ./extensions/token-speed.ts -p "reply with ok" >/tmp/pi-terminal-ui-ui-final-smoke.txt
 git diff --check
 ```
 
@@ -803,7 +803,7 @@ Expected: 12 tests pass. Every command exits with status 0.
 Use a precise edit in `settings.json`.
 
 ```json
-"theme": "imeto-bone",
+"theme": "bone",
 ```
 
 Preserve every pre-existing model and scope change in the file.
@@ -822,7 +822,7 @@ from pathlib import Path
 import sys
 source = Path(sys.argv[1]).read_text()
 old = '  "theme": "parchment",\n'
-new = '  "theme": "imeto-bone",\n'
+new = '  "theme": "bone",\n'
 if source.count(old) != 1:
     raise SystemExit('expected one parchment theme line in HEAD')
 Path(sys.argv[2]).write_text(source.replace(old, new))
@@ -843,22 +843,22 @@ Run:
 
 ```bash
 cd ~/Documents/Personal/pi-config
-git commit -m "docs: activate imeto terminal theme"
+git commit -m "docs: activate pi-terminal-ui terminal theme"
 git status --short
 git diff -- settings.json
 ```
 
-Expected: `settings.json` remains modified only for the pre-existing model and scope changes. Its working-tree theme value is `imeto-bone`.
+Expected: `settings.json` remains modified only for the pre-existing model and scope changes. Its working-tree theme value is `bone`.
 
 - [ ] **Step 6: Import and select the terminal theme**
 
-Use Orca's terminal theme settings to import `themes/imeto-bone.terminal.yaml`. Select `Imeto Bone` for the active terminal.
+Use Orca's terminal theme settings to import `themes/bone.terminal.yaml`. Select `Bone` for the active terminal.
 
 Expected: the terminal background changes to Bone `#e9e3df`. The terminal foreground changes to Deep Navy `#04162a`.
 
 - [ ] **Step 7: Reload the running Pi session**
 
-Run `/reload` in Pi. Confirm that `/settings` reports `imeto-bone` as the active theme.
+Run `/reload` in Pi. Confirm that `/settings` reports `bone` as the active theme.
 
 Expected: Pi hot-reloads the theme. User messages use the warm Bone surface. Tool output uses Cloud Petal or semantic success and error surfaces. The editor status line uses Oxblood, Dusty Blue, Moss Green, Terracotta, Mauve Taupe, and Sage Grey.
 

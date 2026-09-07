@@ -8,7 +8,7 @@ import {
 } from '@earendil-works/pi-coding-agent'
 import type { Component, EditorTheme, TUI } from '@earendil-works/pi-tui'
 import { stripTerminalSequences, visibleWidth } from '@earendil-works/pi-tui'
-import { contextRole } from './imeto-status.ts'
+import { contextRole } from './pi-terminal-ui-status.ts'
 import {
   TOKEN_CACHE_STATUS_KEY,
   TOKEN_RATE_STATUS_KEY,
@@ -18,7 +18,7 @@ import {
   renderQuietFooter,
   type DockField,
   type DockRole,
-} from './imeto-tool-ui.ts'
+} from './pi-terminal-ui-tools.ts'
 
 const STATUS_BRIDGE = Symbol.for('omp.footer.statuses.v1')
 

@@ -1,6 +1,6 @@
-# Im­eto terminal UI mockups
+# Pi terminal UI mockups
 
-These HTML fragments preserve the design comparisons used for the Im­eto center column.
+These HTML fragments preserve the design comparisons used for the Pi Terminal UI center column.
 
 The fragments are designed for the Superpowers visual companion. The companion supplies the outer frame and selection behavior. The inline styles and terminal previews remain editable without rebuilding the implementation.
 

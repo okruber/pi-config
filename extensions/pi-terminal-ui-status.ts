@@ -1,12 +1,12 @@
-import { hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
+import { hexToFg, TERMINAL_UI_COLORS, readThemeHex } from './pi-terminal-ui-style.ts'
 
 export type StatusRole = 'identity' | 'model' | 'reasoning' | 'path' | 'context' | 'muted' | 'danger'
 export type StatusWidths = { left: number; right: number; gap: number }
 
 const STATUS_HEX: Record<StatusRole, string> = {
-  identity: IMETO_COLORS.oxblood, model: IMETO_COLORS.dustyBlue, reasoning: IMETO_COLORS.mossGreen,
-  path: IMETO_COLORS.terracotta, context: IMETO_COLORS.mauveTaupe, muted: IMETO_COLORS.sageGrey,
-  danger: IMETO_COLORS.oxblood,
+  identity: TERMINAL_UI_COLORS.oxblood, model: TERMINAL_UI_COLORS.dustyBlue, reasoning: TERMINAL_UI_COLORS.mossGreen,
+  path: TERMINAL_UI_COLORS.terracotta, context: TERMINAL_UI_COLORS.mauveTaupe, muted: TERMINAL_UI_COLORS.sageGrey,
+  danger: TERMINAL_UI_COLORS.oxblood,
 }
 const STATUS_VAR: Record<StatusRole, string> = {
   identity: 'oxblood', model: 'dustyBlue', reasoning: 'mossGreen', path: 'terracotta',

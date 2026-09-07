@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 
-export const IMETO_COLORS = {
+export const TERMINAL_UI_COLORS = {
   oxblood: '#6a3026',
   bone: '#e9e3df',
   darkSpruce: '#1c1e1b',
@@ -13,7 +13,7 @@ export const IMETO_COLORS = {
   terracotta: '#a56148',
 } as const
 
-export type ImetoColorName = keyof typeof IMETO_COLORS
+export type TerminalUiColorName = keyof typeof TERMINAL_UI_COLORS
 
 function rgb(hex: string): [number, number, number] {
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) throw new Error(`Invalid RGB hex: ${hex}`)

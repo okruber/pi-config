@@ -1,14 +1,14 @@
-# Im­eto Center Column Implementation Plan
+# Pi Terminal UI Center Column Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Create the approved terminal-native Im­eto center column for Pi, including transcript hierarchy, compact built-in tool ledgers, edge-only tool output, and the responsive powerline editor dock.
+**Goal:** Create the approved terminal-native Pi Terminal UI center column for Pi, including transcript hierarchy, compact built-in tool ledgers, edge-only tool output, and the responsive powerline editor dock.
 
-**Architecture:** `extensions/imeto-tool-ui.ts` owns pure rendering policy, width safety, tool ledger components, output wrappers, and responsive dock selection. `extensions/imeto-transcript.ts` applies display-only Markdown transforms and decorates Pi's seven built-in tool definitions while preserving their execution contracts. `extensions/omp-chatbox.ts` renders the powerline dock and editor body, while `extensions/token-speed.ts` publishes cache and token-rate values through the existing footer-status bridge.
+**Architecture:** `extensions/pi-terminal-ui-tools.ts` owns pure rendering policy, width safety, tool ledger components, output wrappers, and responsive dock selection. `extensions/pi-terminal-ui-transcript.ts` applies display-only Markdown transforms and decorates Pi's seven built-in tool definitions while preserving their execution contracts. `extensions/omp-chatbox.ts` renders the powerline dock and editor body, while `extensions/token-speed.ts` publishes cache and token-rate values through the existing footer-status bridge.
 
 **Tech Stack:** Pi `0.84.3` extension APIs, TypeScript, `@earendil-works/pi-tui`, Node.js `node:test`, 24-bit ANSI color, Orca terminal theme.
 
-**Spec:** `docs/superpowers/specs/2026-09-04-imeto-center-column-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-04-pi-terminal-ui-center-column-design.md`
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - The pass will not replace arbitrary custom or MCP tool renderers.
 - The pass will not change tool behavior, model behavior, or session data.
 - The pass will not hide Pi diagnostics by changing unrelated startup settings.
-- `extensions/imeto-style.ts` remains the canonical palette source.
+- `extensions/pi-terminal-ui-style.ts` remains the canonical palette source.
 - The decorated tools are `read`, `bash`, `edit`, `write`, `grep`, `find`, and `ls`.
 - Every renderer measures visible width after removing ANSI sequences.
 - Every truncated fragment closes foreground, background, bold, and inverse state.
@@ -39,7 +39,7 @@
 
 These amendments override narrower snippets below when they conflict.
 
-- The custom preview policy receives semantic output from Pi's original renderer in expanded mode. This prevents Pi from hiding or truncating content before the Im­eto policy runs.
+- The custom preview policy receives semantic output from Pi's original renderer in expanded mode. This prevents Pi from hiding or truncating content before the Pi Terminal UI policy runs.
 - The tool ledger receives the current expansion state because edit and write previews live in the call slot.
 - Summary subjects remove terminal control sequences and normalize line breaks so each ledger header remains one visual row.
 - Diff classification removes terminal sequences before counting changed lines.
@@ -55,12 +55,12 @@ These amendments override narrower snippets below when they conflict.
 ### Task 1: Rendering policy and terminal components
 
 **Files:**
-- Create: `extensions/imeto-tool-ui.ts`
-- Create: `tests/imeto-tool-ui.test.ts`
-- Create: `tests/run-imeto-center-column-tests.sh`
+- Create: `extensions/pi-terminal-ui-tools.ts`
+- Create: `tests/pi-terminal-ui-tools.test.ts`
+- Create: `tests/run-pi-terminal-ui-tests.sh`
 
 **Interfaces:**
-- Consumes: `IMETO_COLORS`, `hexToBg`, `hexToFg`, and `readThemeHex` from `extensions/imeto-style.ts`.
+- Consumes: `TERMINAL_UI_COLORS`, `hexToBg`, `hexToFg`, and `readThemeHex` from `extensions/pi-terminal-ui-style.ts`.
 - Consumes: `Component`, `Theme`, `truncateToWidth`, and `visibleWidth` from `@earendil-works/pi-tui`.
 - Produces: `BUILTIN_TOOL_NAMES`, the readonly tuple `['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']`.
 - Produces: `BuiltInToolName`, the union derived from `BUILTIN_TOOL_NAMES`.
@@ -75,7 +75,7 @@ These amendments override narrower snippets below when they conflict.
 
 - [x] **Step 1: Add the global-Pi test launcher**
 
-Create `tests/run-imeto-center-column-tests.sh` with this content.
+Create `tests/run-pi-terminal-ui-tests.sh` with this content.
 
 ```bash
 #!/usr/bin/env bash
@@ -105,20 +105,20 @@ mkdir -p node_modules/@earendil-works
 ln -s "$pi_root" node_modules/@earendil-works/pi-coding-agent
 ln -s "$pi_root/node_modules/@earendil-works/pi-tui" node_modules/@earendil-works/pi-tui
 
-node --test tests/imeto-*.test.ts
+node --test tests/pi-terminal-ui*.test.ts
 ```
 
 Run:
 
 ```bash
-chmod +x tests/run-imeto-center-column-tests.sh
+chmod +x tests/run-pi-terminal-ui-tests.sh
 ```
 
 Expected: the script is executable. The `trap` removes the temporary root `node_modules` directory on success, failure, or interruption.
 
 - [x] **Step 2: Write failing rendering-policy tests**
 
-Create `tests/imeto-tool-ui.test.ts` with the imports and focused tests below.
+Create `tests/pi-terminal-ui-tools.test.ts` with the imports and focused tests below.
 
 ```ts
 import assert from 'node:assert/strict'
@@ -133,7 +133,7 @@ import {
   summarizeToolCall,
   toolStateSymbol,
   toolVisualState,
-} from '../extensions/imeto-tool-ui.ts'
+} from '../extensions/pi-terminal-ui-tools.ts'
 
 const theme = {
   sourcePath: undefined,
@@ -225,20 +225,20 @@ test('ledger and edge components never exceed supplied width', () => {
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
+./tests/run-pi-terminal-ui-tests.sh
 ```
 
-Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `extensions/imeto-tool-ui.ts`.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `extensions/pi-terminal-ui-tools.ts`.
 
 - [x] **Step 4: Implement the pure state, summary, preview, and ANSI policy**
 
-Create `extensions/imeto-tool-ui.ts`. Use these public types and constants.
+Create `extensions/pi-terminal-ui-tools.ts`. Use these public types and constants.
 
 ```ts
 import type { Theme } from '@earendil-works/pi-coding-agent'
 import type { Component } from '@earendil-works/pi-tui'
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
-import { hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
+import { hexToFg, TERMINAL_UI_COLORS, readThemeHex } from './pi-terminal-ui-style.ts'
 
 export const BUILTIN_TOOL_NAMES = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'] as const
 export type BuiltInToolName = (typeof BUILTIN_TOOL_NAMES)[number]
@@ -246,8 +246,8 @@ export type ToolVisualState = 'pending' | 'success' | 'error'
 export type ToolSummary = { action: BuiltInToolName; subject: string }
 export type PreviewSelection = { lines: string[]; omitted: number }
 
-export const TOKEN_RATE_STATUS_KEY = 'imeto-token-rate'
-export const TOKEN_CACHE_STATUS_KEY = 'imeto-cache-state'
+export const TOKEN_RATE_STATUS_KEY = 'pi-terminal-ui-token-rate'
+export const TOKEN_CACHE_STATUS_KEY = 'pi-terminal-ui-cache-state'
 
 const ANSI_CLOSE = '\x1b[22m\x1b[27m\x1b[39m\x1b[49m'
 const ANSI_BG_RE = /\x1b\[(?:4[0-9]|10[0-7]|48;[^m]*)m/g
@@ -323,7 +323,7 @@ The functions must not mutate `args` or `lines`.
 
 - [x] **Step 5: Implement the ledger and edge components**
 
-Add these component input contracts to `extensions/imeto-tool-ui.ts`.
+Add these component input contracts to `extensions/pi-terminal-ui-tools.ts`.
 
 ```ts
 type ToolTheme = Pick<Theme, 'sourcePath' | 'fg' | 'bold'>
@@ -355,15 +355,15 @@ Implement state color resolution with exact theme variables and fallbacks.
 function stateHex(state: ToolVisualState, sourcePath: string | undefined): string {
   const variable = state === 'pending' ? 'terracotta' : state === 'success' ? 'mossGreen' : 'oxblood'
   const fallback = state === 'pending'
-    ? IMETO_COLORS.terracotta
+    ? TERMINAL_UI_COLORS.terracotta
     : state === 'success'
-      ? IMETO_COLORS.mossGreen
-      : IMETO_COLORS.oxblood
+      ? TERMINAL_UI_COLORS.mossGreen
+      : TERMINAL_UI_COLORS.oxblood
   return readThemeHex(sourcePath, [variable]) ?? fallback
 }
 
 function edgeHex(sourcePath: string | undefined): string {
-  return readThemeHex(sourcePath, ['mauveTaupe']) ?? IMETO_COLORS.mauveTaupe
+  return readThemeHex(sourcePath, ['mauveTaupe']) ?? TERMINAL_UI_COLORS.mauveTaupe
 }
 
 function isBlankAnsi(line: string): boolean {
@@ -402,7 +402,7 @@ Both classes must clear cached width and lines in `invalidate()`. Both classes m
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh 2>&1 | tee /tmp/imeto-center-column-task-1.txt
+./tests/run-pi-terminal-ui-tests.sh 2>&1 | tee /tmp/pi-terminal-ui-center-column-task-1.txt
 ```
 
 Expected: every existing test passes.
@@ -411,11 +411,11 @@ Expected: every existing test passes.
 
 ```bash
 git add \
-  docs/superpowers/plans/2026-09-04-imeto-center-column.md \
-  extensions/imeto-tool-ui.ts \
-  tests/imeto-tool-ui.test.ts \
-  tests/run-imeto-center-column-tests.sh
-git commit -m "feat: add imeto tool rendering core"
+  docs/superpowers/plans/2026-09-04-pi-terminal-ui-center-column.md \
+  extensions/pi-terminal-ui-tools.ts \
+  tests/pi-terminal-ui-tools.test.ts \
+  tests/run-pi-terminal-ui-tests.sh
+git commit -m "feat: add pi-terminal-ui tool rendering core"
 ```
 
 ---
@@ -423,8 +423,8 @@ git commit -m "feat: add imeto tool rendering core"
 ### Task 2: Transcript message hierarchy
 
 **Files:**
-- Create: `extensions/imeto-transcript.ts`
-- Create: `tests/imeto-transcript.test.ts`
+- Create: `extensions/pi-terminal-ui-transcript.ts`
+- Create: `tests/pi-terminal-ui-transcript.test.ts`
 
 **Interfaces:**
 - Consumes: `ExtensionAPI` from `@earendil-works/pi-coding-agent`.
@@ -435,12 +435,12 @@ git commit -m "feat: add imeto tool rendering core"
 
 - [x] **Step 1: Write failing transcript-transform tests**
 
-Create `tests/imeto-transcript.test.ts` with this initial content.
+Create `tests/pi-terminal-ui-transcript.test.ts` with this initial content.
 
 ```ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { transformTranscriptMarkdown } from '../extensions/imeto-transcript.ts'
+import { transformTranscriptMarkdown } from '../extensions/pi-terminal-ui-transcript.ts'
 
 test('user Markdown receives the YOU label and quoted structural edge', () => {
   assert.equal(
@@ -487,14 +487,14 @@ test('blank and long user content remain valid quoted Markdown', () => {
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
+./tests/run-pi-terminal-ui-tests.sh
 ```
 
-Expected: FAIL because `extensions/imeto-transcript.ts` does not exist.
+Expected: FAIL because `extensions/pi-terminal-ui-transcript.ts` does not exist.
 
 - [x] **Step 3: Implement and register the Markdown transformer**
 
-Create `extensions/imeto-transcript.ts` with this first implementation.
+Create `extensions/pi-terminal-ui-transcript.ts` with this first implementation.
 
 ```ts
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
@@ -523,14 +523,14 @@ export default function (pi: ExtensionAPI) {
 }
 ```
 
-Do not style assistant prose directly. The active Im­eto theme already maps `mdHeading` to Oxblood, `text` to Deep Navy, `mdQuote` to quiet text, and `mdQuoteBorder` to Mauve Taupe.
+Do not style assistant prose directly. The active Pi Terminal UI theme already maps `mdHeading` to Oxblood, `text` to Deep Navy, `mdQuote` to quiet text, and `mdQuoteBorder` to Mauve Taupe.
 
 - [x] **Step 4: Run transcript and existing theme tests**
 
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
+./tests/run-pi-terminal-ui-tests.sh
 ```
 
 Expected: every current test passes.
@@ -540,7 +540,7 @@ Expected: every current test passes.
 Run:
 
 ```bash
-pi --no-extensions -e ./extensions/imeto-transcript.ts -p "reply with ok" >/tmp/imeto-transcript-smoke.txt
+pi --no-extensions -e ./extensions/pi-terminal-ui-transcript.ts -p "reply with ok" >/tmp/pi-terminal-ui-transcript-smoke.txt
 ```
 
 Expected: Pi exits with status `0`. The output contains a model response. No extension load error appears.
@@ -548,8 +548,8 @@ Expected: Pi exits with status `0`. The output contains a model response. No ext
 - [x] **Step 6: Commit the transcript hierarchy**
 
 ```bash
-git add extensions/imeto-transcript.ts tests/imeto-transcript.test.ts
-git commit -m "feat: add imeto transcript hierarchy"
+git add extensions/pi-terminal-ui-transcript.ts tests/pi-terminal-ui-transcript.test.ts
+git commit -m "feat: add pi-terminal-ui transcript hierarchy"
 ```
 
 ---
@@ -557,13 +557,13 @@ git commit -m "feat: add imeto transcript hierarchy"
 ### Task 3: Contract-preserving built-in tool decoration
 
 **Files:**
-- Modify: `extensions/imeto-transcript.ts`
-- Modify: `tests/imeto-transcript.test.ts`
+- Modify: `extensions/pi-terminal-ui-transcript.ts`
+- Modify: `tests/pi-terminal-ui-transcript.test.ts`
 
 **Interfaces:**
 - Consumes: `SettingsManager.create(ctx.cwd, getAgentDir(), { projectTrusted: ctx.isProjectTrusted() })`.
 - Consumes: `createReadToolDefinition`, `createBashToolDefinition`, `createEditToolDefinition`, `createWriteToolDefinition`, `createGrepToolDefinition`, `createFindToolDefinition`, and `createLsToolDefinition`.
-- Consumes: `ToolLedgerComponent`, `EdgeOutputComponent`, and `BUILTIN_TOOL_NAMES` from `extensions/imeto-tool-ui.ts`.
+- Consumes: `ToolLedgerComponent`, `EdgeOutputComponent`, and `BUILTIN_TOOL_NAMES` from `extensions/pi-terminal-ui-tools.ts`.
 - Produces: `createRuntimeToolDefinitions(cwd: string, settings: RuntimeToolSettings): AnyToolDefinition[]`.
 - Produces: `decorateBuiltInTool(definition: AnyToolDefinition): AnyToolDefinition`.
 - Preserves: `name`, `label`, `description`, `parameters`, `promptSnippet`, `promptGuidelines`, `constrainedSampling`, `prepareArguments`, `executionMode`, `execute`, result content, and result details.
@@ -571,7 +571,7 @@ git commit -m "feat: add imeto transcript hierarchy"
 
 - [x] **Step 1: Add failing factory-option and definition-contract tests**
 
-Append these imports and tests to `tests/imeto-transcript.test.ts`.
+Append these imports and tests to `tests/pi-terminal-ui-transcript.test.ts`.
 
 ```ts
 import {
@@ -587,7 +587,7 @@ import {
 import {
   createRuntimeToolDefinitions,
   decorateBuiltInTool,
-} from '../extensions/imeto-transcript.ts'
+} from '../extensions/pi-terminal-ui-transcript.ts'
 
 const factories = [
   createReadToolDefinition,
@@ -661,14 +661,14 @@ test('registration covers only Pi built-ins', () => {
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
+./tests/run-pi-terminal-ui-tests.sh
 ```
 
 Expected: FAIL because `createRuntimeToolDefinitions` and `decorateBuiltInTool` are not exported.
 
 - [x] **Step 3: Add runtime settings and built-in factories**
 
-Extend the imports in `extensions/imeto-transcript.ts`.
+Extend the imports in `extensions/pi-terminal-ui-transcript.ts`.
 
 ```ts
 import {
@@ -689,7 +689,7 @@ import {
   EdgeOutputComponent,
   ToolLedgerComponent,
   type BuiltInToolName,
-} from './imeto-tool-ui.ts'
+} from './pi-terminal-ui-tools.ts'
 ```
 
 Use these internal types and factory function.
@@ -835,8 +835,8 @@ Use a temporary file for the edit preview. Run the original `renderCall`, wait f
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
-pi --no-extensions -e ./extensions/imeto-transcript.ts -p "reply with ok" >/tmp/imeto-transcript-contract-smoke.txt
+./tests/run-pi-terminal-ui-tests.sh
+pi --no-extensions -e ./extensions/pi-terminal-ui-transcript.ts -p "reply with ok" >/tmp/pi-terminal-ui-transcript-contract-smoke.txt
 git diff --check
 ```
 
@@ -845,7 +845,7 @@ Expected: all tests pass. Pi exits with status `0`. `git diff --check` prints no
 - [x] **Step 8: Commit built-in tool decoration**
 
 ```bash
-git add extensions/imeto-transcript.ts tests/imeto-transcript.test.ts
+git add extensions/pi-terminal-ui-transcript.ts tests/pi-terminal-ui-transcript.test.ts
 git commit -m "feat: decorate pi built-in tool rendering"
 ```
 
@@ -854,24 +854,24 @@ git commit -m "feat: decorate pi built-in tool rendering"
 ### Task 4: Responsive powerline dock and status publication
 
 **Files:**
-- Modify: `extensions/imeto-tool-ui.ts`
+- Modify: `extensions/pi-terminal-ui-tools.ts`
 - Modify: `extensions/omp-chatbox.ts:1-235`
 - Modify: `extensions/token-speed.ts:1-320`
-- Modify: `tests/imeto-tool-ui.test.ts`
-- Modify: `tests/imeto-terminal-ui.test.ts`
+- Modify: `tests/pi-terminal-ui-tools.test.ts`
+- Modify: `tests/pi-terminal-ui.test.ts`
 
 **Interfaces:**
 - Produces: `DockFieldId`, `DockField`, `selectDockFields(fields: DockField[], width: number): DockField[]`, and `renderDock(fields: DockField[], width: number, sourcePath?: string): string`.
 - Produces: `paintEditorBody(line: string, width: number, sourcePath?: string): string`.
 - Produces: `renderQuietFooter(hint: string, rate: string | undefined, width: number): string`.
-- Produces: `TOKEN_RATE_STATUS_KEY = 'imeto-token-rate'` and `TOKEN_CACHE_STATUS_KEY = 'imeto-cache-state'` from `imeto-tool-ui.ts`.
+- Produces: `TOKEN_RATE_STATUS_KEY = 'pi-terminal-ui-token-rate'` and `TOKEN_CACHE_STATUS_KEY = 'pi-terminal-ui-cache-state'` from `pi-terminal-ui-tools.ts`.
 - Produces: plain status values from `token-speed.ts` through `ctx.ui.setStatus()`.
 - Consumes: footer statuses through `Symbol.for('omp.footer.statuses.v1')`.
 - Preserves: `StatusBridge.version: 1`, cache shard aggregation, streaming-rate calculation, branch refresh, context thresholds, editor input handling, and Pi keybindings.
 
 - [x] **Step 1: Add failing responsive dock tests**
 
-Append these imports and tests to `tests/imeto-tool-ui.test.ts`.
+Append these imports and tests to `tests/pi-terminal-ui-tools.test.ts`.
 
 ```ts
 import {
@@ -880,17 +880,17 @@ import {
   renderQuietFooter,
   selectDockFields,
   type DockField,
-} from '../extensions/imeto-tool-ui.ts'
+} from '../extensions/pi-terminal-ui-tools.ts'
 
 const dockFields: DockField[] = [
   { id: 'identity', text: 'π', role: 'identity', required: true },
   { id: 'model', text: '✺ claude-opus-5', role: 'model', required: true },
   { id: 'reasoning', text: '● high', role: 'reasoning', required: true },
-  { id: 'path', text: '⌘ ~/a/very/long/project/path:imeto-terminal-ui', role: 'path', required: false },
+  { id: 'path', text: '⌘ ~/a/very/long/project/path:pi-terminal-ui', role: 'path', required: false },
   { id: 'context', text: '31%/200k', role: 'context', required: false },
   { id: 'cost', text: '$0.420', role: 'cost', required: false },
   { id: 'cache', text: 'cache 96.1% · day 94.2%', role: 'cache', required: false },
-  { id: 'session', text: 'imeto visual acceptance', role: 'session', required: false },
+  { id: 'session', text: 'pi-terminal-ui visual acceptance', role: 'session', required: false },
 ]
 
 test('dock fields degrade in semantic priority order', () => {
@@ -927,7 +927,7 @@ test('editor body restores Cloud Petal after cursor resets', () => {
 
 - [x] **Step 2: Replace the obsolete token-speed source contract**
 
-In `tests/imeto-terminal-ui.test.ts`, replace `token-speed prefers semantic Im­eto variables` with this test.
+In `tests/pi-terminal-ui.test.ts`, replace `token-speed prefers semantic Pi Terminal UI variables` with this test.
 
 ```ts
 test('token-speed publishes dock statuses without a second powerline widget', () => {
@@ -944,14 +944,14 @@ test('token-speed publishes dock statuses without a second powerline widget', ()
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
+./tests/run-pi-terminal-ui-tests.sh
 ```
 
 Expected: FAIL because the dock functions are not exported. The token-speed source contract also fails because it still registers a widget.
 
 - [x] **Step 4: Implement responsive field selection and ANSI-safe dock rows**
 
-Add these types to `extensions/imeto-tool-ui.ts`.
+Add these types to `extensions/pi-terminal-ui-tools.ts`.
 
 ```ts
 export type DockFieldId =
@@ -970,7 +970,7 @@ Use this drop order and palette mapping.
 
 ```ts
 const DOCK_DROP_ORDER: DockFieldId[] = ['session', 'cache', 'cost', 'context', 'path']
-const DOCK_ROLE_VAR: Record<DockRole, keyof typeof IMETO_COLORS> = {
+const DOCK_ROLE_VAR: Record<DockRole, keyof typeof TERMINAL_UI_COLORS> = {
   identity: 'oxblood',
   model: 'dustyBlue',
   reasoning: 'mossGreen',
@@ -991,8 +991,8 @@ Implement the editor and footer helpers with these color rules.
 ```ts
 export function paintEditorBody(line: string, width: number, sourcePath?: string): string {
   if (width <= 0) return ''
-  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? IMETO_COLORS.cloudPetal
-  const oxblood = readThemeHex(sourcePath, ['oxblood']) ?? IMETO_COLORS.oxblood
+  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? TERMINAL_UI_COLORS.cloudPetal
+  const oxblood = readThemeHex(sourcePath, ['oxblood']) ?? TERMINAL_UI_COLORS.oxblood
   const bg = hexToBg(cloud)
   const restored = line
     .replaceAll('\x1b[0m', `\x1b[0m${bg}`)
@@ -1016,7 +1016,7 @@ export function renderQuietFooter(
 
 - [x] **Step 5: Publish cache and token rate through footer statuses**
 
-Modify `extensions/token-speed.ts` to import `TOKEN_CACHE_STATUS_KEY` and `TOKEN_RATE_STATUS_KEY` from `imeto-tool-ui.ts`.
+Modify `extensions/token-speed.ts` to import `TOKEN_CACHE_STATUS_KEY` and `TOKEN_RATE_STATUS_KEY` from `pi-terminal-ui-tools.ts`.
 
 Retain `readStats()`, `usableCounters()`, `hitPercent()`, `currentRate()`, and the stream timers. Replace `buildSegments()`, `renderRow()`, the below-editor widget, and `themeColor()` with plain status formatting.
 
@@ -1075,7 +1075,7 @@ import {
   renderDock,
   renderQuietFooter,
   type DockField,
-} from './imeto-tool-ui.ts'
+} from './pi-terminal-ui-tools.ts'
 ```
 
 Keep `EmptyFooter`, `STATUS_BRIDGE`, `StatusBridge.version: 1`, branch refresh, model lookup, context lookup, cost lookup, subscription lookup, and `CustomEditor` inheritance.
@@ -1130,12 +1130,12 @@ Keep `setPaddingX(): void {}` because Pi copies the default editor padding into 
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
+./tests/run-pi-terminal-ui-tests.sh
 pi --no-extensions \
   -e ./extensions/omp-chatbox.ts \
   -e ./extensions/token-speed.ts \
-  -e ./extensions/imeto-transcript.ts \
-  -p "reply with ok" >/tmp/imeto-center-column-smoke.txt
+  -e ./extensions/pi-terminal-ui-transcript.ts \
+  -p "reply with ok" >/tmp/pi-terminal-ui-center-column-smoke.txt
 git diff --check
 ```
 
@@ -1157,12 +1157,12 @@ Expected: the first command prints the unchanged bridge symbol and version. The 
 
 ```bash
 git add \
-  extensions/imeto-tool-ui.ts \
+  extensions/pi-terminal-ui-tools.ts \
   extensions/omp-chatbox.ts \
   extensions/token-speed.ts \
-  tests/imeto-tool-ui.test.ts \
-  tests/imeto-terminal-ui.test.ts
-git commit -m "feat: add responsive imeto editor dock"
+  tests/pi-terminal-ui-tools.test.ts \
+  tests/pi-terminal-ui.test.ts
+git commit -m "feat: add responsive pi-terminal-ui editor dock"
 ```
 
 ---
@@ -1172,12 +1172,12 @@ git commit -m "feat: add responsive imeto editor dock"
 **Files:**
 - Modify: `README.md:24-37`
 - Verify without modifying: `settings.json`
-- Verify without modifying: `themes/imeto-bone.json`
-- Verify without modifying: `themes/imeto-bone.terminal.yaml`
-- Verify against: `docs/superpowers/mockups/imeto-terminal-ui/05-selected-center-column.html`
+- Verify without modifying: `themes/bone.json`
+- Verify without modifying: `themes/bone.terminal.yaml`
+- Verify against: `docs/superpowers/mockups/pi-terminal-ui/05-selected-center-column.html`
 
 **Interfaces:**
-- Consumes: the Im­eto Pi theme, paired Orca terminal theme, chatbox, token-speed extension, and transcript extension.
+- Consumes: the Pi Terminal UI Pi theme, paired Orca terminal theme, chatbox, token-speed extension, and transcript extension.
 - Produces: documented activation and acceptance evidence.
 - Preserves: the working tree's existing untracked runtime files and the main checkout's unrelated `settings.json` changes.
 
@@ -1187,7 +1187,7 @@ Replace the final paragraph of `README.md` with this text.
 
 ```md
 The terminal supplies the Bone background. Pi supplies transcript, Markdown,
-tool, diff, syntax, editor, and status colors. `imeto-transcript.ts` decorates
+tool, diff, syntax, editor, and status colors. `pi-terminal-ui-transcript.ts` decorates
 only Pi's seven built-in tools. Custom and MCP tools retain their own renderers.
 The center column intentionally omits persistent side regions.
 ```
@@ -1197,13 +1197,13 @@ The center column intentionally omits persistent side regions.
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
-python3 -m json.tool themes/imeto-bone.json >/dev/null
+./tests/run-pi-terminal-ui-tests.sh
+python3 -m json.tool themes/bone.json >/dev/null
 pi --no-extensions \
   -e ./extensions/omp-chatbox.ts \
   -e ./extensions/token-speed.ts \
-  -e ./extensions/imeto-transcript.ts \
-  -p "reply with ok" >/tmp/imeto-center-column-final-smoke.txt
+  -e ./extensions/pi-terminal-ui-transcript.ts \
+  -p "reply with ok" >/tmp/pi-terminal-ui-center-column-final-smoke.txt
 git diff --check
 test ! -e node_modules
 ```
@@ -1215,17 +1215,17 @@ Expected: every test passes. The theme parses. Pi exits with status `0`. No root
 Run:
 
 ```bash
-isolated="$(mktemp -d /tmp/imeto-center-column.XXXXXX)"
+isolated="$(mktemp -d /tmp/pi-terminal-ui-center-column.XXXXXX)"
 mkdir -p "$isolated/extensions" "$isolated/themes"
-cp extensions/imeto-style.ts "$isolated/extensions/"
-cp extensions/imeto-status.ts "$isolated/extensions/"
-cp extensions/imeto-tool-ui.ts "$isolated/extensions/"
-cp extensions/imeto-transcript.ts "$isolated/extensions/"
+cp extensions/pi-terminal-ui-style.ts "$isolated/extensions/"
+cp extensions/pi-terminal-ui-status.ts "$isolated/extensions/"
+cp extensions/pi-terminal-ui-tools.ts "$isolated/extensions/"
+cp extensions/pi-terminal-ui-transcript.ts "$isolated/extensions/"
 cp extensions/omp-chatbox.ts "$isolated/extensions/"
 cp extensions/token-speed.ts "$isolated/extensions/"
-cp themes/imeto-bone.json "$isolated/themes/"
+cp themes/bone.json "$isolated/themes/"
 ln -s "$HOME/.pi/agent/auth.json" "$isolated/auth.json"
-printf '{"theme":"imeto-bone"}\n' >"$isolated/settings.json"
+printf '{"theme":"bone"}\n' >"$isolated/settings.json"
 printf '%s\n' "$isolated"
 ```
 
@@ -1233,10 +1233,10 @@ Expected: the printed directory contains the copied extension files, the theme, 
 
 - [ ] **Step 4: Start live acceptance with the paired Orca and Pi themes**
 
-Select `Imeto Bone` for the active Orca terminal. Start Pi with the isolated agent directory while retaining normal authentication through the active machine setup.
+Select `Bone` for the active Orca terminal. Start Pi with the isolated agent directory while retaining normal authentication through the active machine setup.
 
 ```bash
-PI_CODING_AGENT_DIR="$isolated" pi --use-theme imeto-bone
+PI_CODING_AGENT_DIR="$isolated" pi --use-theme bone
 ```
 
 Expected: Pi loads the center-column extensions in TUI mode. Pi may show the built-in tool override diagnostic. Do not suppress it through `quietStartup` or another unrelated setting.
@@ -1256,7 +1256,7 @@ Expected: user messages have the `YOU` label, the raised warm surface, and the s
 
 - [ ] **Step 6: Exercise every decorated tool state**
 
-Use safe temporary files under `/tmp/imeto-center-column-acceptance`. Exercise all seven tools.
+Use safe temporary files under `/tmp/pi-terminal-ui-center-column-acceptance`. Exercise all seven tools.
 
 ```text
 1. read: text, syntax-highlighted code, a long collapsed result, an expanded result, and one image.
@@ -1284,7 +1284,7 @@ Expected at every width: the editor accepts text, cursor rendering remains corre
 
 - [ ] **Step 8: Compare the live result with the selected mockup**
 
-Open `docs/superpowers/mockups/imeto-terminal-ui/05-selected-center-column.html` and compare the live TUI with its representative transcript, tool, diff, and dock states.
+Open `docs/superpowers/mockups/pi-terminal-ui/05-selected-center-column.html` and compare the live TUI with its representative transcript, tool, diff, and dock states.
 
 Expected accepted differences: the TUI has no persistent left rail, no persistent right context pane, and no browser styling. Custom and MCP tools keep their own renderers. Pi may display the built-in override diagnostic.
 
@@ -1295,7 +1295,7 @@ Any other visible difference requires a focused failing test before correction.
 Exit the isolated Pi session, then run:
 
 ```bash
-rm -rf "$isolated" /tmp/imeto-center-column-acceptance
+rm -rf "$isolated" /tmp/pi-terminal-ui-center-column-acceptance
 test ! -e "$isolated"
 ```
 
@@ -1305,7 +1305,7 @@ Expected: both temporary directories are absent.
 
 ```bash
 git add README.md
-git commit -m "docs: document imeto center column"
+git commit -m "docs: document pi-terminal-ui center column"
 ```
 
 - [ ] **Step 11: Run final branch verification**
@@ -1313,8 +1313,8 @@ git commit -m "docs: document imeto center column"
 Run:
 
 ```bash
-./tests/run-imeto-center-column-tests.sh
-python3 -m json.tool themes/imeto-bone.json >/dev/null
+./tests/run-pi-terminal-ui-tests.sh
+python3 -m json.tool themes/bone.json >/dev/null
 git diff --check
 git status --short
 git log --oneline --decorate origin/main..HEAD
@@ -1327,8 +1327,8 @@ Expected: every automated check passes. No temporary `node_modules` or isolated 
 The reviewer must read both files.
 
 ```text
-docs/superpowers/specs/2026-09-04-imeto-center-column-design.md
-docs/superpowers/plans/2026-09-04-imeto-center-column.md
+docs/superpowers/specs/2026-09-04-pi-terminal-ui-center-column-design.md
+docs/superpowers/plans/2026-09-04-pi-terminal-ui-center-column.md
 ```
 
 The reviewer must inspect contract preservation, custom and MCP tool isolation, image and diff behavior, width safety, ANSI reset safety, responsive field order, isolated-runtime cleanup, and the live comparison with `05-selected-center-column.html`.

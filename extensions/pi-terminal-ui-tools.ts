@@ -1,7 +1,7 @@
 import type { Theme } from '@earendil-works/pi-coding-agent'
 import type { Component } from '@earendil-works/pi-tui'
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
-import { hexToBg, hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
+import { hexToBg, hexToFg, TERMINAL_UI_COLORS, readThemeHex } from './pi-terminal-ui-style.ts'
 
 export const BUILTIN_TOOL_NAMES = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'] as const
 export type BuiltInToolName = (typeof BUILTIN_TOOL_NAMES)[number]
@@ -19,8 +19,8 @@ export type DockField = {
   required: boolean
 }
 
-export const TOKEN_RATE_STATUS_KEY = 'imeto-token-rate'
-export const TOKEN_CACHE_STATUS_KEY = 'imeto-cache-state'
+export const TOKEN_RATE_STATUS_KEY = 'pi-terminal-ui-token-rate'
+export const TOKEN_CACHE_STATUS_KEY = 'pi-terminal-ui-cache-state'
 
 const ANSI_CLOSE = '\x1b[22m\x1b[27m\x1b[39m\x1b[49m'
 const ANSI_SGR_RE = /\x1b\[([0-9;]*)m/g
@@ -29,7 +29,7 @@ const CHANGED_LINE_RE = /^[+-](?![+-])/
 const POWERLINE_SEPARATOR = '\uE0B0'
 const COMPACT_DOCK_WIDTH = 80
 const DOCK_DROP_ORDER: DockFieldId[] = ['session', 'cache', 'cost', 'context']
-const DOCK_ROLE_VAR: Record<DockRole, keyof typeof IMETO_COLORS> = {
+const DOCK_ROLE_VAR: Record<DockRole, keyof typeof TERMINAL_UI_COLORS> = {
   identity: 'oxblood',
   model: 'dustyBlue',
   reasoning: 'mossGreen',
@@ -150,7 +150,7 @@ export function selectDockFields(fields: DockField[], width: number): DockField[
 
 function dockRoleHex(role: DockRole, sourcePath: string | undefined): string {
   const variable = DOCK_ROLE_VAR[role]
-  return readThemeHex(sourcePath, [variable]) ?? IMETO_COLORS[variable]
+  return readThemeHex(sourcePath, [variable]) ?? TERMINAL_UI_COLORS[variable]
 }
 
 export function renderDock(
@@ -160,7 +160,7 @@ export function renderDock(
 ): string {
   if (width <= 0) return ''
   const selected = selectDockFields(fields, width)
-  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? IMETO_COLORS.cloudPetal
+  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? TERMINAL_UI_COLORS.cloudPetal
   let row = ''
   for (let index = 0; index < selected.length; index++) {
     const field = selected[index]!
@@ -182,8 +182,8 @@ function restoreBackground(text: string, background: string): string {
 
 export function paintEditorBody(line: string, width: number, sourcePath?: string): string {
   if (width <= 0) return ''
-  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? IMETO_COLORS.cloudPetal
-  const oxblood = readThemeHex(sourcePath, ['oxblood']) ?? IMETO_COLORS.oxblood
+  const cloud = readThemeHex(sourcePath, ['cloudPetal']) ?? TERMINAL_UI_COLORS.cloudPetal
+  const oxblood = readThemeHex(sourcePath, ['oxblood']) ?? TERMINAL_UI_COLORS.oxblood
   const background = hexToBg(cloud)
   const contentWidth = Math.max(0, width - 2)
   const content = restoreBackground(truncateToWidth(line, contentWidth, ''), background)
@@ -285,15 +285,15 @@ type SemanticBodyOptions = {
 function stateHex(state: ToolVisualState, sourcePath: string | undefined): string {
   const variable = state === 'pending' ? 'terracotta' : state === 'success' ? 'mossGreen' : 'oxblood'
   const fallback = state === 'pending'
-    ? IMETO_COLORS.terracotta
+    ? TERMINAL_UI_COLORS.terracotta
     : state === 'success'
-      ? IMETO_COLORS.mossGreen
-      : IMETO_COLORS.oxblood
+      ? TERMINAL_UI_COLORS.mossGreen
+      : TERMINAL_UI_COLORS.oxblood
   return readThemeHex(sourcePath, [variable]) ?? fallback
 }
 
 function edgeHex(sourcePath: string | undefined): string {
-  return readThemeHex(sourcePath, ['mauveTaupe']) ?? IMETO_COLORS.mauveTaupe
+  return readThemeHex(sourcePath, ['mauveTaupe']) ?? TERMINAL_UI_COLORS.mauveTaupe
 }
 
 function isBlankAnsi(line: string): boolean {

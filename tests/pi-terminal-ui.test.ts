@@ -9,21 +9,21 @@ import {
   setThemeInstance,
 } from '../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js'
 import {
-  IMETO_COLORS,
+  TERMINAL_UI_COLORS,
   hexToBg,
   hexToFg,
   readThemeHex,
-} from '../extensions/imeto-style.ts'
+} from '../extensions/pi-terminal-ui-style.ts'
 import {
   contextRole,
   fitStatusWidths,
   statusHex,
   statusText,
-} from '../extensions/imeto-status.ts'
+} from '../extensions/pi-terminal-ui-status.ts'
 import {
   TOKEN_CACHE_STATUS_KEY,
   TOKEN_RATE_STATUS_KEY,
-} from '../extensions/imeto-tool-ui.ts'
+} from '../extensions/pi-terminal-ui-tools.ts'
 import ompChatboxExtension, {
   contextDockRole,
   partitionEditorRows,
@@ -34,7 +34,7 @@ import tokenSpeedExtension, {
   type CacheCounters,
 } from '../extensions/token-speed.ts'
 
-const piThemePath = new URL('../themes/imeto-bone.json', import.meta.url).pathname
+const piThemePath = new URL('../themes/bone.json', import.meta.url).pathname
 setThemeInstance(loadThemeFromPath(piThemePath, 'truecolor'))
 
 const EXPECTED = {
@@ -50,8 +50,8 @@ const EXPECTED = {
   terracotta: '#a56148',
 } as const
 
-test('sampled Imeto palette remains exact', () => {
-  assert.deepEqual(IMETO_COLORS, EXPECTED)
+test('sampled Pi Terminal UI palette remains exact', () => {
+  assert.deepEqual(TERMINAL_UI_COLORS, EXPECTED)
 })
 
 test('hex helpers emit truecolor ANSI sequences', () => {
@@ -60,7 +60,7 @@ test('hex helpers emit truecolor ANSI sequences', () => {
 })
 
 test('theme lookup uses the first matching valid hex value', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'imeto-theme-'))
+  const dir = mkdtempSync(join(tmpdir(), 'pi-terminal-ui-theme-'))
   const sourcePath = join(dir, 'theme.json')
   writeFileSync(sourcePath, JSON.stringify({ vars: { accent: '#123456', fallback: 'invalid' } }))
   assert.equal(readThemeHex(sourcePath, ['missing', 'accent']), '#123456')
@@ -87,35 +87,35 @@ const REQUIRED_THEME_TOKENS = [
 ] as const
 
 test('Pi theme defines every required token and exact brand variables', () => {
-  const theme = JSON.parse(readFileSync(new URL('../themes/imeto-bone.json', import.meta.url), 'utf8'))
-  assert.equal(theme.name, 'imeto-bone')
-  for (const [name, hex] of Object.entries(IMETO_COLORS)) assert.equal(theme.vars[name], hex)
+  const theme = JSON.parse(readFileSync(new URL('../themes/bone.json', import.meta.url), 'utf8'))
+  assert.equal(theme.name, 'bone')
+  for (const [name, hex] of Object.entries(TERMINAL_UI_COLORS)) assert.equal(theme.vars[name], hex)
   for (const token of REQUIRED_THEME_TOKENS) assert.equal(typeof theme.colors[token], 'string', token)
 })
 
 test('terminal theme pairs Bone background with Deep Navy foreground', () => {
-  const yaml = readFileSync(new URL('../themes/imeto-bone.terminal.yaml', import.meta.url), 'utf8')
-  assert.match(yaml, /^name: Imeto Bone$/m)
+  const yaml = readFileSync(new URL('../themes/bone.terminal.yaml', import.meta.url), 'utf8')
+  assert.match(yaml, /^name: Bone$/m)
   assert.match(yaml, /^background: "#e9e3df"$/m)
   assert.match(yaml, /^foreground: "#04162a"$/m)
   assert.match(yaml, /^selection: "#907062"$/m)
 })
 
-test('status roles map to the approved Imeto palette', () => {
-  assert.equal(statusHex('identity'), IMETO_COLORS.oxblood)
-  assert.equal(statusHex('model'), IMETO_COLORS.dustyBlue)
-  assert.equal(statusHex('reasoning'), IMETO_COLORS.mossGreen)
-  assert.equal(statusHex('path'), IMETO_COLORS.terracotta)
-  assert.equal(statusHex('context'), IMETO_COLORS.mauveTaupe)
-  assert.equal(statusHex('danger'), IMETO_COLORS.oxblood)
+test('status roles map to the approved Pi Terminal UI palette', () => {
+  assert.equal(statusHex('identity'), TERMINAL_UI_COLORS.oxblood)
+  assert.equal(statusHex('model'), TERMINAL_UI_COLORS.dustyBlue)
+  assert.equal(statusHex('reasoning'), TERMINAL_UI_COLORS.mossGreen)
+  assert.equal(statusHex('path'), TERMINAL_UI_COLORS.terracotta)
+  assert.equal(statusHex('context'), TERMINAL_UI_COLORS.mauveTaupe)
+  assert.equal(statusHex('danger'), TERMINAL_UI_COLORS.oxblood)
 })
 
 test('status roles honor matching variables from the active theme', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'imeto-status-'))
+  const dir = mkdtempSync(join(tmpdir(), 'pi-terminal-ui-status-'))
   const sourcePath = join(dir, 'theme.json')
   writeFileSync(sourcePath, JSON.stringify({ vars: { oxblood: '#123456' } }))
   assert.equal(statusHex('identity', sourcePath), '#123456')
-  assert.equal(statusHex('model', sourcePath), IMETO_COLORS.dustyBlue)
+  assert.equal(statusHex('model', sourcePath), TERMINAL_UI_COLORS.dustyBlue)
 })
 
 test('context pressure selects neutral, warning, and danger roles', () => {

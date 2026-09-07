@@ -25,4 +25,4 @@ mkdir -p node_modules/@earendil-works
 ln -s "$pi_root" node_modules/@earendil-works/pi-coding-agent
 ln -s "$pi_root/node_modules/@earendil-works/pi-tui" node_modules/@earendil-works/pi-tui
 
-node --test tests/imeto-*.test.ts
+node --test tests/pi-terminal-ui*.test.ts

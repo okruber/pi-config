@@ -20,14 +20,14 @@ import {
   loadThemeFromPath,
   setThemeInstance,
 } from '../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js'
-import { hexToFg, IMETO_COLORS } from '../extensions/imeto-style.ts'
-import imetoTranscriptExtension, {
+import { hexToFg, TERMINAL_UI_COLORS } from '../extensions/pi-terminal-ui-style.ts'
+import terminalUiTranscriptExtension, {
   createRuntimeToolDefinitions,
   decorateBuiltInTool,
   transformTranscriptMarkdown,
-} from '../extensions/imeto-transcript.ts'
+} from '../extensions/pi-terminal-ui-transcript.ts'
 
-const themePath = fileURLToPath(new URL('../themes/imeto-bone.json', import.meta.url))
+const themePath = fileURLToPath(new URL('../themes/bone.json', import.meta.url))
 const renderTheme = loadThemeFromPath(themePath, 'truecolor')
 setThemeInstance(renderTheme)
 
@@ -183,19 +183,19 @@ test('blank and long user content remain valid quoted Markdown', () => {
   })), '> ')
 })
 
-test('missing theme data uses exact Im­eto transcript fallbacks', () => {
+test('missing theme data uses exact Pi Terminal UI transcript fallbacks', () => {
   const transformed = transformTranscriptMarkdown('Body', {
     messageType: 'user',
     isStreaming: false,
     availableWidth: 80,
-    themeSourcePath: '/missing/imeto-theme.json',
+    themeSourcePath: '/missing/pi-terminal-ui-theme.json',
   })
-  assert.ok(!transformed.includes(hexToFg(IMETO_COLORS.oxblood)))
-  assert.ok(transformed.includes(hexToFg(IMETO_COLORS.deepNavy)))
+  assert.ok(!transformed.includes(hexToFg(TERMINAL_UI_COLORS.oxblood)))
+  assert.ok(transformed.includes(hexToFg(TERMINAL_UI_COLORS.deepNavy)))
 })
 
 test('extension wiring follows live TUI body colors and clears them for other lifecycles', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'imeto-transcript-'))
+  const directory = mkdtempSync(join(tmpdir(), 'pi-terminal-ui-transcript-'))
   try {
     const firstPath = join(directory, 'first.json')
     const secondPath = join(directory, 'second.json')
@@ -216,7 +216,7 @@ test('extension wiring follows live TUI body colors and clears them for other li
         handlers.set(name, handler)
       },
     }
-    imetoTranscriptExtension(pi as any)
+    terminalUiTranscriptExtension(pi as any)
     assert.ok(transformer)
 
     const theme = { sourcePath: firstPath }
@@ -236,11 +236,11 @@ test('extension wiring follows live TUI body colors and clears them for other li
     assert.ok(transform().includes(hexToFg('#141516')))
 
     handlers.get('session_start')?.({}, { mode: 'print' })
-    assert.ok(transform().includes(hexToFg(IMETO_COLORS.deepNavy)))
+    assert.ok(transform().includes(hexToFg(TERMINAL_UI_COLORS.deepNavy)))
 
     handlers.get('session_start')?.({}, tuiContext)
     handlers.get('session_shutdown')?.()
-    assert.ok(transform().includes(hexToFg(IMETO_COLORS.deepNavy)))
+    assert.ok(transform().includes(hexToFg(TERMINAL_UI_COLORS.deepNavy)))
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -397,7 +397,7 @@ test('write decoration keeps one original renderer while applying its own previe
 })
 
 test('edit decoration retains asynchronous preview state and source indentation', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'imeto-edit-render-'))
+  const directory = mkdtempSync(join(tmpdir(), 'pi-terminal-ui-edit-render-'))
   try {
     const path = join(directory, 'file.ts')
     const oldLines = [
@@ -459,7 +459,7 @@ test('edit decoration retains asynchronous preview state and source indentation'
   }
 })
 
-test('Pi renders user content without a title and keeps the upright Im­eto body role', () => {
+test('Pi renders user content without a title and keeps the upright Pi Terminal UI body role', () => {
   const transformer = (markdown: string, context: any) => transformTranscriptMarkdown(markdown, {
     ...context,
     themeSourcePath: themePath,
@@ -469,7 +469,7 @@ test('Pi renders user content without a title and keeps the upright Im­eto body
   const body = lines.find((line) => stripTerminalSequences(line).includes('Inspect'))
   assert.ok(!lines.some((line) => /^│ YOU\s*$/.test(stripTerminalSequences(line).trimStart())))
   assert.ok(body)
-  assert.match(body, new RegExp(`\\x1b\\[23m${escapeRegExp(hexToFg(IMETO_COLORS.deepNavy))}Inspect`))
+  assert.match(body, new RegExp(`\\x1b\\[23m${escapeRegExp(hexToFg(TERMINAL_UI_COLORS.deepNavy))}Inspect`))
   assert.match(stripTerminalSequences(body), /│ Inspect theme\.json\./)
 })
 

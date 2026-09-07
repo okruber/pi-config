@@ -13,13 +13,13 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent'
 import type { Component } from '@earendil-works/pi-tui'
-import { hexToFg, IMETO_COLORS, readThemeHex } from './imeto-style.ts'
+import { hexToFg, TERMINAL_UI_COLORS, readThemeHex } from './pi-terminal-ui-style.ts'
 import {
   BUILTIN_TOOL_NAMES,
   EdgeOutputComponent,
   ToolLedgerComponent,
   type BuiltInToolName,
-} from './imeto-tool-ui.ts'
+} from './pi-terminal-ui-tools.ts'
 
 export type TranscriptTransformContext = {
   messageType: 'user' | 'assistant' | 'assistant-thinking'
@@ -36,7 +36,7 @@ function quoteMarkdown(markdown: string): string {
 }
 
 function userBody(markdown: string, sourcePath: string | undefined): string {
-  const color = readThemeHex(sourcePath, ['deepNavy']) ?? IMETO_COLORS.deepNavy
+  const color = readThemeHex(sourcePath, ['deepNavy']) ?? TERMINAL_UI_COLORS.deepNavy
   const prefix = `${ANSI_ITALIC_OFF}${hexToFg(color)}`
   return markdown.split('\n').map((line) => `> ${prefix}${line}${ANSI_FG_OFF}`).join('\n')
 }

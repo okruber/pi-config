@@ -1,4 +1,4 @@
-# Im­eto center column for Pi
+# Pi Terminal UI center column for Pi
 
 Date: 2026-09-04
 Status: approved design, pending written-spec review
@@ -6,15 +6,15 @@ Owning repo: `okruber/pi-config`
 
 ## Relationship to the first stage
 
-This design extends `2026-09-04-imeto-terminal-ui-design.md`.
+This design extends `2026-09-04-pi-terminal-ui-design.md`.
 
-The first stage established the Im­eto palette and the Pi theme. The first stage also established the Orca terminal theme and status-line colors. Live inspection showed that those changes mostly recolored Pi's existing interface. The result did not carry enough of the approved OMP hierarchy into the transcript. Tool calls and their output retained Pi's existing structure. Diffs and the editor dock also retained too much of that structure.
+The first stage established the Pi Terminal UI palette and the Pi theme. The first stage also established the Orca terminal theme and status-line colors. Live inspection showed that those changes mostly recolored Pi's existing interface. The result did not carry enough of the approved OMP hierarchy into the transcript. Tool calls and their output retained Pi's existing structure. Diffs and the editor dock also retained too much of that structure.
 
 The existing implementation commits remain useful inputs. They are not accepted as the complete visual result.
 
 ## Goal
 
-The first high-fidelity pass will create a terminal-native center column that resembles the approved Im­eto mockups. The pass will improve transcript hierarchy. The pass will improve built-in tool rendering. The pass will improve expanded output and diffs. The pass will replace the editor dock treatment. The pass will not add persistent side regions.
+The first high-fidelity pass will create a terminal-native center column that resembles the approved Pi Terminal UI mockups. The pass will improve transcript hierarchy. The pass will improve built-in tool rendering. The pass will improve expanded output and diffs. The pass will replace the editor dock treatment. The pass will not add persistent side regions.
 
 ## Non-goals
 
@@ -28,7 +28,7 @@ The first high-fidelity pass will create a terminal-native center column that re
 
 ## Saved mockups
 
-The editable comparison sources live in `docs/superpowers/mockups/imeto-terminal-ui/`.
+The editable comparison sources live in `docs/superpowers/mockups/pi-terminal-ui/`.
 
 - `01-tool-call-grammar.html` compares inline ledger, editorial block, and activity rail treatments.
 - `02-expanded-output-treatment.html` compares edge-only, semantic inset, and line-band output treatments.
@@ -86,11 +86,11 @@ Every renderer measures visible width after removing ANSI sequences. Every trunc
 
 ### Shared palette
 
-`extensions/imeto-style.ts` remains the canonical palette source. Renderers resolve matching variables from the active theme before using exact Im­eto fallbacks.
+`extensions/pi-terminal-ui-style.ts` remains the canonical palette source. Renderers resolve matching variables from the active theme before using exact Pi Terminal UI fallbacks.
 
 ### Tool UI module
 
-A new `extensions/imeto-tool-ui.ts` module owns the terminal components and pure formatting policy.
+A new `extensions/pi-terminal-ui-tools.ts` module owns the terminal components and pure formatting policy.
 
 The module selects tool states and formats summaries. The module renders output edges and truncates previews. The module fits ANSI content to visible widths. The module selects responsive status fields.
 
@@ -100,7 +100,7 @@ The module has no execution responsibility.
 
 ### Transcript extension
 
-A new `extensions/imeto-transcript.ts` extension installs the transcript treatment in TUI mode.
+A new `extensions/pi-terminal-ui-transcript.ts` extension installs the transcript treatment in TUI mode.
 
 The extension registers a Markdown transformer for user and thinking display. The user transform adds the `YOU` label and a quoted structural edge. The thinking transform adds a quiet quoted edge. The transformer does not alter persisted messages or model context.
 
@@ -122,11 +122,11 @@ A tool adapter may wrap Pi's original renderer when the original component owns 
 
 ### Custom and MCP tools
 
-Custom and MCP tools retain their registered renderers or Pi's default fallback renderer. The Im­eto theme continues to provide readable pending, success, error, title, output, and diff colors for those rows.
+Custom and MCP tools retain their registered renderers or Pi's default fallback renderer. The Pi Terminal UI theme continues to provide readable pending, success, error, title, output, and diff colors for those rows.
 
 ## Data flow
 
-1. Pi loads `imeto-transcript.ts` with the other configured extensions.
+1. Pi loads `pi-terminal-ui-transcript.ts` with the other configured extensions.
 2. The `session_start` handler exits when `ctx.mode` is not `tui`.
 3. The handler reads runtime settings for `ctx.cwd`.
 4. The handler creates and decorates the seven built-in tool definitions.
@@ -142,7 +142,7 @@ Custom and MCP tools retain their registered renderers or Pi's default fallback 
 
 A renderer exception must not affect tool execution. Pi's standard fallback renderer remains the recovery path.
 
-A missing theme variable uses the exact Im­eto fallback. A malformed theme file does not prevent the extension from loading.
+A missing theme variable uses the exact Pi Terminal UI fallback. A malformed theme file does not prevent the extension from loading.
 
 A missing runtime setting uses Pi's factory default. The extension does not write settings while constructing tool definitions.
 
@@ -172,7 +172,7 @@ Tests verify that custom and MCP tools remain untouched.
 
 ### Integration tests
 
-An isolated Pi directory loads the Im­eto theme, chatbox, token-speed extension, and transcript extension. Smoke checks verify extension loading without repository changes.
+An isolated Pi directory loads the Pi Terminal UI theme, chatbox, token-speed extension, and transcript extension. Smoke checks verify extension loading without repository changes.
 
 Live acceptance exercises long user content and every thinking level. Live acceptance exercises pending, successful, and failed tools. Live acceptance exercises collapsed and expanded output. Live acceptance exercises syntax, images, and diffs. Live acceptance repeats representative states near 80, 120, and 160 columns.
 

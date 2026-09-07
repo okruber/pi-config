@@ -1,7 +1,7 @@
-# Terminal companion to imeto-bone.json. Pi cannot paint the terminal
+# Terminal companion to bone.json. Pi cannot paint the terminal
 # background, so the Bone ground comes from the terminal itself.
 # Warp-format YAML, which is what Orca's "Import from YAML" reads.
-name: Imeto Bone
+name: Bone
 details: lighter
 background: "#e9e3df"
 foreground: "#04162a"

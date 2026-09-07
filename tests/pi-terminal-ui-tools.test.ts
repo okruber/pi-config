@@ -15,7 +15,7 @@ import {
   toolStateSymbol,
   toolVisualState,
   type DockField,
-} from '../extensions/imeto-tool-ui.ts'
+} from '../extensions/pi-terminal-ui-tools.ts'
 
 const theme = {
   sourcePath: undefined,
@@ -27,11 +27,11 @@ const dockFields: DockField[] = [
   { id: 'identity', text: 'π', role: 'identity', required: true },
   { id: 'model', text: '✺ claude-opus-5', role: 'model', required: true },
   { id: 'reasoning', text: '● high', role: 'reasoning', required: true },
-  { id: 'path', text: '⌘ ~/a/very/long/project/path:imeto-terminal-ui', role: 'path', required: false },
+  { id: 'path', text: '⌘ ~/a/very/long/project/path:pi-terminal-ui', role: 'path', required: false },
   { id: 'context', text: '31%/200k', role: 'context', required: false },
   { id: 'cost', text: '$0.420', role: 'cost', required: false },
   { id: 'cache', text: 'cache 96.1% · day 94.2%', role: 'cache', required: false },
-  { id: 'session', text: 'imeto visual acceptance', role: 'session', required: false },
+  { id: 'session', text: 'pi-terminal-ui visual acceptance', role: 'session', required: false },
 ]
 
 test('dock fields degrade in semantic priority order', () => {

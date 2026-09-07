@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { TOKEN_CACHE_STATUS_KEY, TOKEN_RATE_STATUS_KEY } from "./imeto-tool-ui.ts";
+import { TOKEN_CACHE_STATUS_KEY, TOKEN_RATE_STATUS_KEY } from "./pi-terminal-ui-tools.ts";
 const CHARS_PER_TOKEN = 4;
 const RENDER_INTERVAL_MS = 500;
 // pi-cache-optimizer debounces its disk write by 2s, so a later re-render is
