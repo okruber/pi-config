@@ -12,7 +12,7 @@ const STOPS = [
 ];
 
 const WIDGET_KEY = "imeto-splash";
-const TICK_MS = 80;
+const TICK_MS = 160;
 const LEFT_PAD = 3;
 const RIGHT_PAD = 2;
 const CLOTH_ROWS = 6; // cloth band height in rows (2 half-cell hops per row)
@@ -91,7 +91,7 @@ function vertexRow(params: {
 }
 
 function frameLines(frame: number, width: number): string[] {
-	const t = frame * (TICK_MS / 1000) * 6.0;
+	const t = frame * (TICK_MS / 1000) * 2.5;
 	const dx = Math.max(24, width - LEFT_PAD - RIGHT_PAD);
 	const dy = CLOTH_ROWS * 2;
 	const frameHash = frame;
@@ -123,8 +123,22 @@ function frameLines(frame: number, width: number): string[] {
 				continue;
 			}
 
+			// Sheer fabric: pick a density glyph from the half-cell coverage so
+			// edges render as ░/▒ and only the thickest ridges hit ▓/█, which
+			// reads as translucent gauze rather than a solid slab.
+			const coverage = (top.inCloth ? 1 : 0) + (bottom.inCloth ? 1 : 0);
+			const sprinkle = hash(x, row * 2, frameHash);
+			let glyph: string;
+			if (coverage === 2 && sprinkle > 0.15) {
+				glyph = Math.max(top.sNorm, bottom.sNorm) < 0.5 ? "▓" : "█";
+			} else if (coverage === 2) {
+				glyph = "▓";
+			} else if (coverage === 1) {
+				glyph = sprinkle < 0.5 ? "▒" : "░";
+			} else {
+				glyph = "░";
+			}
 			const shade = Math.max(top.shade, bottom.shade);
-			const glyph = top.inCloth && bottom.inCloth ? "█" : bottom.inCloth ? "▄" : "▀";
 			line +=
 				fg(Math.round(c.r * shade), Math.round(c.g * shade), Math.round(c.b * shade)) +
 				glyph +
