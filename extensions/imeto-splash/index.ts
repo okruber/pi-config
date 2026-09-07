@@ -10,12 +10,19 @@ const STOPS = [
 	{ pos: 0.45, r: 0xa5, g: 0x61, b: 0x49 }, // fired_terracotta
 	{ pos: 1.0, r: 0xe9, g: 0xe3, b: 0xde }, // stone_greige
 ];
-const BONE_WHITE = { r: 0xfb, g: 0xf9, b: 0xf7 };
 
 const WIDGET_KEY = "imeto-splash";
-const TICK_MS = 200;
-const WIDTH = 46;
-const LEFT_PAD = 2;
+const TICK_MS = 80;
+const LEFT_PAD = 3;
+const RIGHT_PAD = 2;
+const CLOTH_ROWS = 6; // cloth band height in rows (2 half-cell hops per row)
+
+interface Vertex {
+	inCloth: boolean;
+	sNorm: number;
+	shade: number;
+	fold: boolean;
+}
 
 function fg(r: number, g: number, b: number): string {
 	return `\x1b[38;2;${r};${g};${b}m`;
@@ -39,66 +46,93 @@ function colorAt(pos: number): { r: number; g: number; b: number } {
 	return { r: last.r, g: last.g, b: last.b };
 }
 
-// Deterministic per-(x,y,frame) hash in [0,1), used to make the edge
-// pixels sparkle instead of a hard silhouette.
+// Deterministic per-(x,y,frame) hash in [0,1). Used to dissolve the cloth
+// edge and shim the fold shading with pixel noise instead of a hard edge.
 function hash(x: number, y: number, frame: number): number {
-	let h = x * 73856093 ^ (y * 19349663 ^ frame * 83492791);
-	h = (h ^ (h >>> 13)) * 1274126177;
+	let h = Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(frame, 83492791);
+	h = Math.imul(h ^ (h >>> 13), 1274126177);
 	h ^= h >>> 16;
 	return (h >>> 0) / 4294967296;
 }
 
-const RAMP = ["█", "▓", "▒", "░"];
+const EMPTY: Vertex = { inCloth: false, sNorm: 0, shade: 0, fold: false };
 
 /**
- * A thin strip of cloth: the top edge is pinned and sways gently, the
- * bottom hem rides a travelling wave that bulges in and out like a sail.
- * Brightness ramps left-to-right through the imeto gradient, and a per-cell
- * hash occasionally knocks a pixel down the ramp so the edge shimmers.
+ * A thin strip of cloth pinned near the top, with a free hem at the bottom.
+ * Free edge is driven by two long travelling waves plus a short flutter for
+ * fabric grain; fold shading alternates ridges and troughs so the strip reads
+ * like draped fabric rather than a solid bar.
  */
-function clothRow(row: number, t: number, frame: number): string {
-	let line = " ".repeat(LEFT_PAD);
-	const topEdge = (x: number): number => 1 + Math.round(0.6 * Math.sin(x * 0.35 + t));
-	const thickness = (x: number): number =>
-		Math.max(2, 2 + Math.round(1.8 * Math.sin(x * 0.5 - t * 1.3)));
-
-	for (let x = 0; x < WIDTH; x++) {
-		const yTop = topEdge(x);
-		const yBot = yTop + thickness(x);
-		if (row < yTop || row >= yBot) {
-			line += " ";
-			continue;
-		}
-		const pos = x / (WIDTH - 1);
-		const c = colorAt(pos);
-		let depth = row - yTop; // 0 = cloth face, higher = inner fold shadow
-		// Inner fold gets slightly darker.
-		const shade = Math.max(0.6, 1 - depth * 0.12);
-		const isEdge = depth === 0 || Math.abs(hash(x, row, frame) - 0.5) < 0.12;
-		const rampIdx = isEdge ? (depth === 0 ? 0 : Math.min(3, depth)) : Math.min(2, depth);
-		line += fg(
-			Math.round(c.r * shade),
-			Math.round(c.g * shade),
-			Math.round(c.b * shade),
-		) + RAMP[rampIdx] + RESET;
+function vertexRow(params: {
+	y: number;
+	dy: number;
+	dx: number;
+	t: number;
+}): Vertex[] {
+	const { y, dy, dx, t } = params;
+	const out: Vertex[] = [];
+	for (let x = 0; x < dx; x++) {
+		const u = x / (dx - 1);
+		const w1 = 0.5 * Math.sin(u * 6.7 + t * 0.9);
+		const w2 = 0.25 * Math.cos(u * 9.2 - t * 1.6);
+		const wip = 0.12 * Math.sin(u * 21.3 - t * 3.9);
+		const top = Math.max(0.05, 0.1 + 0.28 * w1 + 0.18 * w2);
+		const bottom = Math.min(1, top + 0.58 + 0.2 * w2 + wip);
+		const yNorm = y / (dy - 1);
+		const inCloth = yNorm >= top && yNorm <= bottom;
+		const sNorm = inCloth ? (yNorm - top) / Math.max(1e-4, bottom - top) : 0;
+		// Fold shading: light ridges alternate with shadowed troughs.
+		const foldPhase = u * 10.6 - t * 0.4;
+		const fold = sNorm > 0.15 && sNorm < 0.9 && Math.cos(foldPhase) > 0.35;
+		const shade = inCloth ? (fold ? 1.0 : 1.12 - sNorm * 0.25) : 0;
+		out.push({ inCloth, sNorm, shade, fold });
 	}
-	return line;
+	return out;
 }
 
-function renderLogo(frame: number): string[] {
-	const t = frame * 0.55;
-	const rows: string[] = [];
-	// Cloth occupies at most ~7 rows; reserve them all so the widget height is stable.
-	for (let y = 0; y < 7; y++) rows.push(clothRow(y, t, frame));
-	rows.push("");
-	rows.push(
-		" ".repeat(LEFT_PAD) +
-			" ".repeat(Math.floor(WIDTH / 2 - 3)) +
-			fg(BONE_WHITE.r, BONE_WHITE.g, BONE_WHITE.b) +
-			"imeto" +
-			RESET,
-	);
-	return rows;
+function frameLines(frame: number, width: number): string[] {
+	const t = frame * (TICK_MS / 1000) * 6.0;
+	const dx = Math.max(24, width - LEFT_PAD - RIGHT_PAD);
+	const dy = CLOTH_ROWS * 2;
+	const frameHash = frame;
+
+	// Build the sub-cell grid columns first, then pair y rows into half-blocks.
+	const passIn = { y: 0, dy, dx, t };
+	const grid: Vertex[][] = [];
+	for (let y = 0; y < dy; y++) {
+		passIn.y = y;
+		grid.push(vertexRow(passIn));
+	}
+
+	const lines: string[] = [];
+	for (let row = 0; row < CLOTH_ROWS; row++) {
+		let line = " ".repeat(LEFT_PAD);
+		for (let x = 0; x < dx; x++) {
+			const top = grid[row * 2][x] ?? EMPTY;
+			const bottom = grid[row * 2 + 1][x] ?? EMPTY;
+			const u = x / (dx - 1);
+			const c = colorAt(u);
+			const shimmer = hash(x, row * 2, frameHash) < 0.04 || hash(x, row * 2 + 1, frameHash) < 0.04;
+
+			if (!top.inCloth && !bottom.inCloth) {
+				line += " ";
+				continue;
+			}
+			if (shimmer) {
+				line += " ";
+				continue;
+			}
+
+			const shade = Math.max(top.shade, bottom.shade);
+			const glyph = top.inCloth && bottom.inCloth ? "█" : bottom.inCloth ? "▄" : "▀";
+			line +=
+				fg(Math.round(c.r * shade), Math.round(c.g * shade), Math.round(c.b * shade)) +
+				glyph +
+				RESET;
+		}
+		lines.push(line);
+	}
+	return lines;
 }
 
 function goQuiet(): boolean {
@@ -131,12 +165,12 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.mode !== "tui") return;
 		if (goQuiet()) return;
 
-		ctx.ui.setWidget(WIDGET_KEY, renderLogo(frame));
+		const width = Math.min(ctx.ui.terminal?.cols ?? 80, 90);
+		ctx.ui.setWidget(WIDGET_KEY, frameLines(frame, width));
 		timer = setInterval(() => {
 			frame++;
-			ctx.ui.setWidget(WIDGET_KEY, renderLogo(frame));
+			ctx.ui.setWidget(WIDGET_KEY, frameLines(frame, width));
 		}, TICK_MS);
-		// Keep the render interval separate from pi's own keepalive process.
 		if (typeof timer === "object" && typeof timer.unref === "function") timer.unref();
 	});
 
