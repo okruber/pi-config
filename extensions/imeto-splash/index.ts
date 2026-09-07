@@ -3,7 +3,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Image, getCapabilities } from "@earendil-works/pi-tui";
 
 function fg(c: { r: number; g: number; b: number }): string {
 	return `\x1b[38;2;${c.r};${c.g};${c.b}m`;
@@ -315,32 +314,16 @@ function renderClothBraille(widthCells: number, t: number, frame: number): Brail
 }
 
 // ------------------------------------------------------------
-// Widget component: either an Image (Kitty/Ghostty/…) or braille text.
+// Widget component: braille text only. The Image/Kitty route was dropped
+// because orca's terminal doesn't render embedded images (shows a placeholder).
 // ------------------------------------------------------------
 
 function frameWidget(
-	tui: { theme: any },
+	_tui: { theme: any },
 	cols: number,
 	frame: number,
-): Image | { render(width: number): string[] } {
+): { render(width: number): string[] } {
 	const widthCells = Math.min(Math.max(24, cols - 2), 80);
-	let okImage = false;
-	try {
-		getCapabilities();
-		okImage = true;
-	} catch {
-		okImage = false;
-	}
-
-	if (okImage) {
-		const { png } = renderClothFrame(widthCells, frame * 0.012, frame);
-		const imageTheme = {
-			fallbackColor: (str: string) => str,
-		};
-		return new Image(Buffer.from(png.buffer).toString("base64"), "image/png", imageTheme as any, {
-			maxWidthCells: widthCells,
-		});
-	}
 	const { lines } = renderClothBraille(widthCells, frame * 0.012, frame);
 	return { render: () => lines };
 }
