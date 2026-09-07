@@ -3,49 +3,39 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Image, getCapabilities } from "@earendil-works/pi-tui";
 
-// Per-cell gradient colors for this frame.
-interface CellColor {
-	r: number;
-	g: number;
-	b: number;
-}
-interface RenderFrame {
-	grid: boolean[][]; // [y][x] sub-cell occupancy
-	shades: number[][]; // [y][x] fold shading in (0..1]
-	avgColor: CellColor[]; // averaged per cell, widthCells long
-	widthCells: number;
-	rows: number;
-}
-
-interface Vertex {
-	inCloth: boolean;
-	shade: number;
-}
-
-const WIDGET_KEY = "imeto-splash";
-const TICK_MS = 500;
-const LEFT_PAD = 1;
-const RIGHT_PAD = 1;
-const CLOTH_ROWS = 5;
-const BOX_WIDTH = 64;
-const TITLE = "Welcome";
-
-// Imeto palette: a three-stop diagonal ramp across the cloth.
-const STOPS: CellColor[] = [
-	{ r: 0x6a, g: 0x30, b: 0x26 }, // burnt_umber
-	{ r: 0xa5, g: 0x61, b: 0x49 }, // fired_terracotta
-	{ r: 0xfb, g: 0xf9, b: 0xf7 }, // bone_white highlight
-];
-
-const RESET = "\x1b[0m";
-const BOX_FG = "\x1b[38;2;99;99;99m";
-
-function fg(c: CellColor): string {
+function fg(c: { r: number; g: number; b: number }): string {
 	return `\x1b[38;2;${c.r};${c.g};${c.b}m`;
 }
+const RESET = "\x1b[0m";
 
-function colorAt(pos: number): CellColor {
+const WIDGET_KEY = "imeto-splash";
+const TICK_MS = 350;
+const TITLE = "Welcome";
+
+// Clamp to a value range for the braille fallback.
+function clamp(v: number, lo: number, hi: number): number {
+	return v < lo ? lo : v > hi ? hi : v;
+}
+
+// Hash for edge shimmer in the braille fallback.
+function hash(x: number, y: number, frame: number): number {
+	let h = Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(frame, 83492791);
+	h = Math.imul(h ^ (h >>> 13), 1274126177);
+	h ^= h >>> 16;
+	return (h >>> 0) / 4294967296;
+}
+
+// Imeto palette, sampled from the header files.
+const STOPS = [
+	{ pos: 0.0, r: 0x6a, g: 0x30, b: 0x26 }, // burnt_umber
+	{ pos: 0.45, r: 0xa5, g: 0x61, b: 0x49 }, // fired_terracotta
+	{ pos: 0.8, r: 0xe9, g: 0xe3, b: 0xde }, // stone_greige
+	{ pos: 1.0, r: 0xfb, g: 0xf9, b: 0xf7 }, // bone_white highlight
+];
+
+function colorAt(pos: number): { r: number; g: number; b: number } {
 	for (let i = 1; i < STOPS.length; i++) {
 		const a = STOPS[i - 1];
 		const b = STOPS[i];
@@ -62,34 +52,114 @@ function colorAt(pos: number): CellColor {
 	return { r: last.r, g: last.g, b: last.b };
 }
 
-// Per-(x,y,frame) hash to dissolve stray pixels at the cloth edge.
-function hash(x: number, y: number, frame: number): number {
-	let h = Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(frame, 83492791);
-	h = Math.imul(h ^ (h >>> 13), 1274126177);
-	h ^= h >>> 16;
-	return (h >>> 0) / 4294967296;
+// ------------------------------------------------------------
+// PNG path (true bitmap): 8-bit RGB wrapped in a minimal PNG so we can hand
+// pi's Image component real pixels and anti-aliased curves.
+// ------------------------------------------------------------
+
+function crc32(buf: Uint8Array): number {
+	let crc = 0xffffffff;
+	for (let i = 0; i < buf.length; i++) {
+		crc ^= buf[i];
+		for (let j = 0; j < 8; j++) {
+			crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+		}
+	}
+	return (crc ^ 0xffffffff) >>> 0;
 }
 
-const BRAILLE_BITS = [
-	[0x1, 0x2, 0x4, 0x40],
-	[0x8, 0x10, 0x20, 0x80],
-];
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+	const len = new Uint8Array(4);
+	new DataView(len.buffer).setUint32(0, data.length, false);
+	const t = new TextEncoder().encode(type);
+	const out = new Uint8Array(4 + 4 + data.length + 4);
+	out.set(len, 0);
+	out.set(t, 4);
+	out.set(data, 8);
+	const crc = new Uint8Array(4);
+	new DataView(crc.buffer).setUint32(0, crc32(new Uint8Array(out.subarray(4, 8 + data.length))), false);
+	out.set(crc, 8 + data.length);
+	return out;
+}
 
 /**
- * Cloth evaluation at sub-pixel resolution. Returns the occupancy grid plus
- * the per-cell average color, so an empty cell can show a faint tint that
- * makes the edge dissolve instead of snapping off, and so the box border can
- * pick up the overall tone.
+ * Minimal PNG wrapper: 8-bit RGB source, no interlace. The per-frame cloth
+ * is a few hundred pixels wide so this stays cheap.
  */
-function renderCloth(widthCells: number, t: number, frame: number): RenderFrame {
+const pngSig = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function makePng(rgb: Uint8Array, width: number, height: number): Uint8Array {
+	const ihdr = new Uint8Array(13);
+	new DataView(ihdr.buffer).setUint32(0, width, false);
+	new DataView(ihdr.buffer).setUint32(4, height, false);
+	ihdr[8] = 8; // bit depth
+	ihdr[9] = 2; // RGB
+	ihdr[10] = 0; // compression (deflate)
+	ihdr[11] = 0; // filter method (standard)
+	ihdr[12] = 0; // interlace (none)
+
+	const stride = width * 3 + 1;
+	const raw = new Uint8Array(stride * height);
+	for (let y = 0; y < height; y++) {
+		raw[y * stride] = 0; // filter none
+		raw.set(rgb.subarray(y * width * 3, (y + 1) * width * 3), y * stride + 1);
+	}
+
+	const idat = pngChunk("IDAT", deflateSync(raw));
+	const out = new Uint8Array(
+		pngSig.length + pngChunk("IHDR", ihdr).length + idat.length + pngChunk("IEND", new Uint8Array(0)).length,
+	);
+	let off = 0;
+	out.set(pngSig, off);
+	off += pngSig.length;
+	const ihdrChunk = pngChunk("IHDR", ihdr);
+	out.set(ihdrChunk, off);
+	off += ihdrChunk.length;
+	out.set(idat, off);
+	off += idat.length;
+	out.set(pngChunk("IEND", new Uint8Array(0)), off);
+	return out;
+}
+
+function deflateSync(data: Uint8Array): Uint8Array {
+	// Node's zlib.deflateSync signature accepts (Buffer|Uint8Array); wrap in
+	// Buffer to keep types happy.
+	const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+	// zlib is built in; importing keeps the extension self-contained.
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	const zlib = require("node:zlib") as typeof import("node:zlib");
+	return zlib.deflateSync(buf, { level: 6 }) as unknown as Uint8Array;
+}
+
+// ------------------------------------------------------------
+// Frame renderer: evaluates the cloth at pixel resolution either to RGBA
+// (PNG) or sub-cell braille. Cloth is a thin strip pinned near the top,
+// hem driven by two long waves plus flutter, fold shading via cosine bands.
+// ------------------------------------------------------------
+
+interface ClothVertex {
+	inCloth: boolean;
+	shade: number;
+}
+
+interface RenderResult {
+	// PNG path
+	png?: Uint8Array;
+	widthCells: number;
+	rows: number;
+}
+
+const CLOTH_ROWS = 4;
+
+function renderClothFrame(widthCells: number, t: number, frame: number): RenderResult {
 	const sx = widthCells * 2;
 	const sy = CLOTH_ROWS * 4;
 
 	const top = (u: number): number =>
-		0.1 + 0.2 * Math.sin(u * 5.7 + t) + 0.1 * Math.cos(u * 9.6 - t * 0.9);
+		clamp(0.1 + 0.2 * Math.sin(u * 5.8 + t) + 0.1 * Math.cos(u * 9.4 - t * 0.8), 0, 0.3);
 	const bottom = (u: number, tp: number): number => {
-		const long = 0.42 * Math.sin(u * 5.7 + t + 0.6);
-		const mid = 0.24 * Math.cos(u * 9.6 - t * 0.9 + 1.3);
+		const long = 0.42 * Math.sin(u * 5.8 + t + 0.6);
+		const mid = 0.24 * Math.cos(u * 9.4 - t * 0.8 + 1.2);
 		const fl = 0.07 * Math.sin(u * 23 - t * 2.8);
 		const thickness = 0.55 + 0.25 * Math.cos(u * 4.8 - t * 0.6);
 		return Math.min(1, tp + thickness * (0.6 + 0.4 * long + 0.4 * mid) + fl * 0.3);
@@ -97,16 +167,10 @@ function renderCloth(widthCells: number, t: number, frame: number): RenderFrame 
 
 	const grid: boolean[][] = [];
 	const shades: number[][] = [];
-	const avgColor: CellColor[] = [];
-
 	for (let y = 0; y < sy; y++) {
 		grid.push(new Array(sx).fill(false));
 		shades.push(new Array(sx).fill(0));
 	}
-	for (let xCell = 0; xCell < widthCells; xCell++) {
-		avgColor.push({ r: 0, g: 0, b: 0 });
-	}
-
 	for (let x = 0; x < sx; x++) {
 		const u = x / (sx - 1);
 		const tp = top(u);
@@ -120,7 +184,7 @@ function renderCloth(widthCells: number, t: number, frame: number): RenderFrame 
 				const fold = Math.cos(foldPhase) > 0.25 ? 0 : 0.1;
 				const sNorm = (yNorm - tp) / Math.max(1e-4, bt - tp);
 				shade = 1.2 - 0.35 * sNorm - fold;
-				if (hash(x, y, frame) > 0.96) {
+				if (hash(x, y, frame) > 0.97) {
 					grid[y][x] = false;
 					shades[y][x] = 0;
 				} else {
@@ -131,89 +195,144 @@ function renderCloth(widthCells: number, t: number, frame: number): RenderFrame 
 		}
 	}
 
-	// Average lit sub-pixels into one color per cell, so the box border and
-	// empty-edge blend have something to blend with.
-	const colorCount: number[] = new Array(widthCells).fill(0);
-	for (let x = 0; x < sx; x++) {
-		const xCell = Math.floor(x / 2);
-		const u = x / (sx - 1);
-		const c = colorAt(u);
-		for (let y = 0; y < sy; y++) {
-			if (grid[y][x]) {
+	// RGB pixels, one cell column == 2 sub-pixel columns for finer edge detail.
+	const rgb = new Uint8Array(sx * sy * 3);
+	const avg = { r: 0, g: 0, b: 0 };
+	for (let y = 0; y < sy; y++) {
+		for (let x = 0; x < sx; x++) {
+			const inCloth = grid[y][x];
+			const u = x / (sx - 1);
+			const c = colorAt(u);
+			if (inCloth) {
 				const shade = shades[y][x];
-				avgColor[xCell] = {
-					r: avgColor[xCell].r + Math.min(255, c.r * shade),
-					g: avgColor[xCell].g + Math.min(255, c.g * shade),
-					b: avgColor[xCell].b + Math.min(255, c.b * shade),
-				};
-				colorCount[xCell] += 1;
+				rgb[(y * sx + x) * 3] = Math.round(c.r * shade);
+				rgb[(y * sx + x) * 3 + 1] = Math.round(c.g * shade);
+				rgb[(y * sx + x) * 3 + 2] = Math.round(c.b * shade);
 			}
 		}
 	}
-	for (let xCell = 0; xCell < widthCells; xCell++) {
-		if (colorCount[xCell] > 0) {
-			avgColor[xCell] = {
-				r: Math.round(avgColor[xCell].r / colorCount[xCell]),
-				g: Math.round(avgColor[xCell].g / colorCount[xCell]),
-				b: Math.round(avgColor[xCell].b / colorCount[xCell]),
-			};
-		}
-	}
-
-	return { grid, shades, avgColor, widthCells, rows: CLOTH_ROWS };
+	void avg;
+	return { png: makePng(rgb, sx, sy), widthCells, rows: CLOTH_ROWS };
 }
 
-/**
- * Border box render: top edge has the title in dim grey; cloth cells render
- * with their own glyph + fg. Empty sub-cells adjacent to cloth also get a
- * very faint tint at ~6% brightness so the edge blurs instead of end.
- */
-function renderBox(widthCells: number, frame: number): string[] {
-	const fr = renderCloth(widthCells, frame, frame);
-	const inner: string[] = [];
-	const colorIndex: number[] = []; // visible index → color fallback
+// ------------------------------------------------------------
+// Braille fallback: renderClothFrame always returns png for Ghostty; if the
+// terminal can't do images we rebuild with dot sub-cells instead.
+// ------------------------------------------------------------
 
-	for (let row = 0; row < fr.rows; row++) {
+interface BrailleRender {
+	lines: string[];
+	widthCells: number;
+}
+
+const BRAILLE_BITS = [
+	[0x1, 0x2, 0x4, 0x40],
+	[0x8, 0x10, 0x20, 0x80],
+];
+
+function renderClothBraille(widthCells: number, t: number, frame: number): BrailleRender {
+	const sx = widthCells * 2;
+	const sy = CLOTH_ROWS * 4;
+
+	const top = (u: number): number =>
+		clamp(0.1 + 0.2 * Math.sin(u * 5.8 + t) + 0.1 * Math.cos(u * 9.4 - t * 0.8), 0, 0.3);
+	const bottom = (u: number, tp: number): number => {
+		const long = 0.42 * Math.sin(u * 5.8 + t + 0.6);
+		const mid = 0.24 * Math.cos(u * 9.4 - t * 0.8 + 1.2);
+		const fl = 0.07 * Math.sin(u * 23 - t * 2.8);
+		const thickness = 0.55 + 0.25 * Math.cos(u * 4.8 - t * 0.6);
+		return Math.min(1, tp + thickness * (0.6 + 0.4 * long + 0.4 * mid) + fl * 0.3);
+	};
+
+	const grid: ClothVertex[][] = [];
+	for (let y = 0; y < sy; y++) {
+		const rowCells: ClothVertex[] = [];
+		for (let x = 0; x < sx; x++) {
+			const u = x / (sx - 1);
+			const tp = top(u);
+			const bt = bottom(u, tp);
+			const yNorm = y / (sy - 1);
+			const inCloth = yNorm >= tp && yNorm <= bt;
+			let shade = 0;
+			if (inCloth) {
+				const foldPhase = u * 10.6 - t * 0.35;
+				const fold = Math.cos(foldPhase) > 0.25 ? 0 : 0.1;
+				const sNorm = (yNorm - tp) / Math.max(1e-4, bt - tp);
+				shade = 1.2 - 0.35 * sNorm - fold;
+				if (hash(x, y, frame) > 0.97) {
+					rowCells.push({ inCloth: false, shade });
+					continue;
+				}
+			}
+			rowCells.push({ inCloth, shade });
+		}
+		grid.push(rowCells);
+	}
+
+	const lines: string[] = [];
+	for (let row = 0; row < CLOTH_ROWS; row++) {
 		let line = "";
-		for (let xCell = 0; xCell < fr.widthCells; xCell++) {
+		for (let xCell = 0; xCell < widthCells; xCell++) {
 			let bits = 0;
 			for (let xDot = 0; xDot < 2; xDot++) {
 				for (let yDot = 0; yDot < 4; yDot++) {
 					const ySub = row * 4 + yDot;
 					const xSub = xCell * 2 + xDot;
-					if (fr.grid[ySub]?.[xSub]) bits |= BRAILLE_BITS[xDot][yDot];
+					if (grid[ySub]?.[xSub]?.inCloth) bits |= BRAILLE_BITS[xDot][yDot];
 				}
 			}
 			if (bits === 0) {
-				// Faint ambient tint so the cloth edge dissolves into the padding.
-				const c = fr.avgColor[xCell];
-				line += fg({
-					r: Math.round(c.r * 0.08),
-					g: Math.round(c.g * 0.08),
-					b: Math.round(c.b * 0.08),
-				}) + "·" + RESET;
-				colorIndex[xCell] = xCell;
+				line += " ";
 				continue;
 			}
-			const c = fr.avgColor[xCell];
-			line += fg(c) + String.fromCharCode(0x2800 + bits) + RESET;
-			colorIndex[xCell] = xCell;
+			const u = xCell / (widthCells - 1);
+			const c = colorAt(u);
+			let shadeSum = 0;
+			let n = 0;
+			for (let xDot = 0; xDot < 2; xDot++) {
+				for (let yDot = 0; yDot < 4; yDot++) {
+					const ySub = row * 4 + yDot;
+					const xSub = xCell * 2 + xDot;
+					const b = grid[ySub]?.[xSub];
+					if (b?.inCloth) {
+						shadeSum += b.shade;
+						n++;
+					}
+				}
+			}
+			const shade = n > 0 ? shadeSum / n : 0.9;
+			line += fg({
+				r: Math.round(c.r * shade),
+				g: Math.round(c.g * shade),
+				b: Math.round(c.b * shade),
+			});
+			line += String.fromCharCode(0x2800 + bits);
+			line += RESET;
 		}
-		inner.push(line);
+		lines.push(line);
 	}
+	return { lines, widthCells };
+}
 
-	const interior = Math.max(0, BOX_WIDTH - 4 - (TITLE.length + 2));
-	const header = `╭─ ${BOX_FG}${TITLE}${RESET} ${BOX_FG}${"─".repeat(interior)}${RESET}╮`;
-	const footer = `╰${"─".repeat(BOX_WIDTH)}╯`;
+// ------------------------------------------------------------
+// Widget component: either an Image (Kitty/Ghostty/…) or braille text.
+// ------------------------------------------------------------
 
-	const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
-	const body = inner.map((line) => {
-		const vis = stripAnsi(line).length;
-		const pad = Math.max(0, BOX_WIDTH - 2 - vis);
-		return `│${" ".repeat(LEFT_PAD)}${line}${" ".repeat(pad)}│`;
-	});
+function frameWidget(
+	tui: { theme: any },
+	cols: number,
+	frame: number,
+): Image | { render(width: number): string[] } {
+	const widthCells = Math.min(Math.max(24, cols - 2), 80);
 
-	return [header, ...body, footer];
+	if (okImage) {
+		const { png } = renderClothFrame(widthCells, frame * 0.012, frame);
+		return new Image(Buffer.from(png.buffer).toString("base64"), "image/png", tui.theme, {
+			maxWidthCells: widthCells,
+		});
+	}
+	const { lines } = renderClothBraille(widthCells, frame * 0.012, frame);
+	return { render: () => lines };
 }
 
 function goQuiet(): boolean {
@@ -247,11 +366,16 @@ export default function (pi: ExtensionAPI) {
 		if (goQuiet()) return;
 
 		const cols = ctx.ui.terminal?.cols ?? 80;
-		const widthCells = Math.min(Math.max(24, cols - LEFT_PAD - RIGHT_PAD - 2), BOX_WIDTH - 2);
-		ctx.ui.setWidget(WIDGET_KEY, renderBox(widthCells, frame));
+		const render = (): void =>
+			ctx.ui.setWidget(
+				WIDGET_KEY,
+				(tui: { theme: any }, theme: any) =>
+					frameWidget({ theme }, cols, frame) as any,
+			);
+		render();
 		timer = setInterval(() => {
 			frame++;
-			ctx.ui.setWidget(WIDGET_KEY, renderBox(widthCells, frame));
+			render();
 		}, TICK_MS);
 		if (typeof timer === "object" && typeof timer.unref === "function") timer.unref();
 	});
