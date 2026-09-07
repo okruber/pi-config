@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-// Imeto palette, sampled from the brand header files.
+// Imeto palette.
 const STOPS = [
 	{ pos: 0.0, r: 0x6a, g: 0x30, b: 0x26 }, // burnt_umber
 	{ pos: 0.45, r: 0xa5, g: 0x61, b: 0x49 }, // fired_terracotta
@@ -13,16 +13,9 @@ const STOPS = [
 
 const WIDGET_KEY = "imeto-splash";
 const TICK_MS = 160;
-const LEFT_PAD = 3;
+const LEFT_PAD = 2;
 const RIGHT_PAD = 2;
-const CLOTH_ROWS = 6; // cloth band height in rows (2 half-cell hops per row)
-
-interface Vertex {
-	inCloth: boolean;
-	sNorm: number;
-	shade: number;
-	fold: boolean;
-}
+const CLOTH_ROWS = 4; // braille rows (4 sub-rows of dots each)
 
 function fg(r: number, g: number, b: number): string {
 	return `\x1b[38;2;${r};${g};${b}m`;
@@ -46,8 +39,8 @@ function colorAt(pos: number): { r: number; g: number; b: number } {
 	return { r: last.r, g: last.g, b: last.b };
 }
 
-// Deterministic per-(x,y,frame) hash in [0,1). Used to dissolve the cloth
-// edge and shim the fold shading with pixel noise instead of a hard edge.
+// Per-(sx,sy,frame) hash in [0,1), used to gently dissolve isolated sub-pixels
+// at the cloth edge so the silhouette isn't hard-clipped.
 function hash(x: number, y: number, frame: number): number {
 	let h = Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(frame, 83492791);
 	h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -55,94 +48,107 @@ function hash(x: number, y: number, frame: number): number {
 	return (h >>> 0) / 4294967296;
 }
 
-const EMPTY: Vertex = { inCloth: false, sNorm: 0, shade: 0, fold: false };
-
-/**
- * A thin strip of cloth pinned near the top, with a free hem at the bottom.
- * Free edge is driven by two long travelling waves plus a short flutter for
- * fabric grain; fold shading alternates ridges and troughs so the strip reads
- * like draped fabric rather than a solid bar.
- */
-function vertexRow(params: {
-	y: number;
-	dy: number;
-	dx: number;
-	t: number;
-}): Vertex[] {
-	const { y, dy, dx, t } = params;
-	const out: Vertex[] = [];
-	for (let x = 0; x < dx; x++) {
-		const u = x / (dx - 1);
-		const w1 = 0.5 * Math.sin(u * 6.7 + t * 0.9);
-		const w2 = 0.25 * Math.cos(u * 9.2 - t * 1.6);
-		const wip = 0.12 * Math.sin(u * 21.3 - t * 3.9);
-		const top = Math.max(0.05, 0.1 + 0.28 * w1 + 0.18 * w2);
-		const bottom = Math.min(1, top + 0.58 + 0.2 * w2 + wip);
-		const yNorm = y / (dy - 1);
-		const inCloth = yNorm >= top && yNorm <= bottom;
-		const sNorm = inCloth ? (yNorm - top) / Math.max(1e-4, bottom - top) : 0;
-		// Fold shading: light ridges alternate with shadowed troughs.
-		const foldPhase = u * 10.6 - t * 0.4;
-		const fold = sNorm > 0.15 && sNorm < 0.9 && Math.cos(foldPhase) > 0.35;
-		const shade = inCloth ? (fold ? 1.0 : 1.12 - sNorm * 0.25) : 0;
-		out.push({ inCloth, sNorm, shade, fold });
-	}
-	return out;
+interface Bulge {
+	inCloth: boolean;
+	shade: number;
 }
 
-function frameLines(frame: number, width: number): string[] {
-	const t = frame * (TICK_MS / 1000) * 2.5;
-	const dx = Math.max(24, width - LEFT_PAD - RIGHT_PAD);
-	const dy = CLOTH_ROWS * 2;
-	const frameHash = frame;
+/**
+ * Braille sub-cell position for (xDot, yDot): which bit of the braille glyph
+ * corresponds to that dot. Braille is a 2x4 dot grid per cell, encoded as
+ * U+2800 + bitmask.
+ */
+const BRAILLE_BITS = [
+	[0x1, 0x2, 0x4, 0x40], // y0..y3, x0
+	[0x8, 0x10, 0x20, 0x80], // y0..y3, x1
+];
 
-	// Build the sub-cell grid columns first, then pair y rows into half-blocks.
-	const passIn = { y: 0, dy, dx, t };
-	const grid: Vertex[][] = [];
-	for (let y = 0; y < dy; y++) {
-		passIn.y = y;
-		grid.push(vertexRow(passIn));
+/**
+ * One frame of cloth at sub-cell resolution. For every (x,y) sub-pixel we
+ * answer "is this inside the cloth" and "what shade", then we pack four y
+ * rows and two x columns into a single braille glyph.
+ */
+function renderCloth(widthCells: number, t: number, frame: number): string[] {
+	const sx = widthCells * 2;
+	const sy = CLOTH_ROWS * 4;
+
+	const wave = {
+		// Pinned-ish top edge that drifts very slightly.
+		top(u: number): number {
+			return 0.12 + 0.22 * Math.sin(u * 6.1 + t) + 0.12 * Math.cos(u * 9.4 - t * 1.3);
+		},
+		// Free hem rider: long wave + moderate wave + flutter.
+		bottom(u: number, top: number): number {
+			const long = 0.42 * Math.sin(u * 6.1 + t + 0.6);
+			const mid = 0.22 * Math.cos(u * 9.4 - t * 1.3 + 1.2);
+			const fl = 0.08 * Math.sin(u * 24 - t * 3.1);
+			const thickness = 0.5 + 0.25 * Math.cos(u * 5.4 - t * 0.7);
+			return Math.min(1, top + thickness * (0.6 + 0.4 * (long + mid)) + fl * 0.3);
+		},
+	};
+
+	const grid: Bulge[][] = [];
+	for (let y = 0; y < sy; y++) {
+		const rowCells: Bulge[] = [];
+		for (let x = 0; x < sx; x++) {
+			const u = x / (sx - 1);
+			const top = wave.top(u);
+			const bottom = wave.bottom(u, top);
+			const yNorm = y / (sy - 1);
+			const inCloth = yNorm >= top && yNorm <= bottom;
+			let shade = 0;
+			if (inCloth) {
+				// Ridges and troughs with a cosine band so the surface reads like
+				// draped fabric rather than an even gradient.
+				const foldPhase = u * 11 - t * 0.4;
+				const fold = Math.cos(foldPhase) > 0.3 ? 0 : 0.12;
+				shade = 1.2 - 0.45 * (yNorm - top) / Math.max(1e-4, bottom - top) - fold;
+				// Edge dissolve: rare sub-pixel removal so the hem flutters.
+				if (hash(x, y, frame) < 0.03) rowCells.push({ inCloth: false, shade });
+				else rowCells.push({ inCloth, shade });
+			} else {
+				rowCells.push({ inCloth: false, shade });
+			}
+		}
+		grid.push(rowCells);
 	}
 
 	const lines: string[] = [];
 	for (let row = 0; row < CLOTH_ROWS; row++) {
 		let line = " ".repeat(LEFT_PAD);
-		for (let x = 0; x < dx; x++) {
-			const top = grid[row * 2][x] ?? EMPTY;
-			const bottom = grid[row * 2 + 1][x] ?? EMPTY;
-			const u = x / (dx - 1);
+		for (let xCell = 0; xCell < widthCells; xCell++) {
+			let bits = 0;
+			for (let xDot = 0; xDot < 2; xDot++) {
+				for (let yDot = 0; yDot < 4; yDot++) {
+					const ySub = row * 4 + yDot;
+					const xSub = xCell * 2 + xDot;
+					if (grid[ySub]?.[xSub]?.inCloth) bits |= BRAILLE_BITS[xDot][yDot];
+				}
+			}
+			if (bits === 0) {
+				line += " ";
+				continue;
+			}
+			const u = xCell / (widthCells - 1);
 			const c = colorAt(u);
-			const shimmer = hash(x, row * 2, frameHash) < 0.04 || hash(x, row * 2 + 1, frameHash) < 0.04;
-
-			if (!top.inCloth && !bottom.inCloth) {
-				line += " ";
-				continue;
+			// Average shade across the lit sub-pixels in this cell.
+			let shadeSum = 0;
+			let n = 0;
+			for (let xDot = 0; xDot < 2; xDot++) {
+				for (let yDot = 0; yDot < 4; yDot++) {
+					const ySub = row * 4 + yDot;
+					const xSub = xCell * 2 + xDot;
+					const b = grid[ySub]?.[xSub];
+					if (b && b.inCloth) {
+						shadeSum += b.shade;
+						n++;
+					}
+				}
 			}
-			if (shimmer) {
-				line += " ";
-				continue;
-			}
-
-			// Sheer fabric: pick a density glyph from the half-cell coverage so
-			// edges render as ░/▒ and only the thickest ridges hit ▓/█, which
-			// reads as translucent gauze rather than a solid slab.
-			const coverage = (top.inCloth ? 1 : 0) + (bottom.inCloth ? 1 : 0);
-			const sprinkle = hash(x, row * 2, frameHash);
-			let glyph: string;
-			if (coverage === 2 && sprinkle > 0.15) {
-				glyph = Math.max(top.sNorm, bottom.sNorm) < 0.5 ? "▓" : "█";
-			} else if (coverage === 2) {
-				glyph = "▓";
-			} else if (coverage === 1) {
-				glyph = sprinkle < 0.5 ? "▒" : "░";
-			} else {
-				glyph = "░";
-			}
-			const shade = Math.max(top.shade, bottom.shade);
-			line +=
-				fg(Math.round(c.r * shade), Math.round(c.g * shade), Math.round(c.b * shade)) +
-				glyph +
-				RESET;
+			const shade = n > 0 ? shadeSum / n : 0.9;
+			line += fg(Math.round(c.r * shade), Math.round(c.g * shade), Math.round(c.b * shade));
+			line += String.fromCharCode(0x2800 + bits);
+			line += RESET;
 		}
 		lines.push(line);
 	}
@@ -179,11 +185,12 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.mode !== "tui") return;
 		if (goQuiet()) return;
 
-		const width = Math.min(ctx.ui.terminal?.cols ?? 80, 90);
-		ctx.ui.setWidget(WIDGET_KEY, frameLines(frame, width));
+		const cols = Math.max(30, (ctx.ui.terminal?.cols ?? 80) - LEFT_PAD - RIGHT_PAD);
+		const widthCells = Math.min(cols, 56);
+		ctx.ui.setWidget(WIDGET_KEY, renderCloth(widthCells, frame * 0.45, frame));
 		timer = setInterval(() => {
 			frame++;
-			ctx.ui.setWidget(WIDGET_KEY, frameLines(frame, width));
+			ctx.ui.setWidget(WIDGET_KEY, renderCloth(widthCells, frame * 0.45, frame));
 		}, TICK_MS);
 		if (typeof timer === "object" && typeof timer.unref === "function") timer.unref();
 	});
