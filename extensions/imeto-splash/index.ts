@@ -334,7 +334,10 @@ function frameWidget(
 
 	if (okImage) {
 		const { png } = renderClothFrame(widthCells, frame * 0.012, frame);
-		return new Image(Buffer.from(png.buffer).toString("base64"), "image/png", tui.theme, {
+		const imageTheme = {
+			fallbackColor: (str: string) => str,
+		};
+		return new Image(Buffer.from(png.buffer).toString("base64"), "image/png", imageTheme as any, {
 			maxWidthCells: widthCells,
 		});
 	}
