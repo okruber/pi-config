@@ -324,6 +324,13 @@ function frameWidget(
 	frame: number,
 ): Image | { render(width: number): string[] } {
 	const widthCells = Math.min(Math.max(24, cols - 2), 80);
+	let okImage = false;
+	try {
+		getCapabilities();
+		okImage = true;
+	} catch {
+		okImage = false;
+	}
 
 	if (okImage) {
 		const { png } = renderClothFrame(widthCells, frame * 0.012, frame);
