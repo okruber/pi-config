@@ -1,0 +1,32 @@
+# Terminal companion to osseo-bone.json. Pi cannot paint the terminal
+# background, so the osseo-bone ground comes from the terminal itself.
+# Warp-format YAML, which is what Orca's "Import from YAML" reads.
+name: Osseo Bone
+details: lighter
+background: "#e9e3df"
+foreground: "#04162a"
+accent: "#6a3026"
+cursor: "#6a3026"
+# Orca's Warp importer ignores these keys. Selection colors live only in the
+# stored theme, so importing this file does not guarantee the selection pair.
+selection: "#907062"
+selectionText: "#fbf9f7"
+terminal_colors:
+  normal:
+    black: "#1c1e1b"
+    red: "#6a3026"
+    green: "#3e4739"
+    yellow: "#a56148"
+    blue: "#6f7f90"
+    magenta: "#907062"
+    cyan: "#58716b"
+    white: "#d8cdc7"
+  bright:
+    black: "#73747a"
+    red: "#8b4b3f"
+    green: "#61705a"
+    yellow: "#bd795e"
+    blue: "#8894a0"
+    magenta: "#a48a7e"
+    cyan: "#718985"
+    white: "#fbf9f7"
