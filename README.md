@@ -28,11 +28,11 @@ node scripts/sync-model-scope.mjs --check
 
 The Pi theme and terminal-emulator theme must be used together.
 
-1. Import `themes/bone.terminal.yaml` into Orca as a custom terminal theme.
-2. Select `Bone` for the Orca terminal.
+1. Import `themes/osseo-bone.terminal.yaml` into Orca as a custom terminal theme.
+2. Select `osseo-bone` for the Orca terminal.
 3. Run `/reload` in Pi.
 
-The terminal supplies the Bone background. Pi supplies transcript, Markdown,
-tool, diff, syntax, editor, and status colors. `pi-terminal-ui-transcript.ts` decorates
+The terminal supplies the bone background. Pi supplies transcript, Markdown,
+tool, diff, syntax, editor, and status colors. `osseo-transcript.ts` decorates
 only Pi's seven built-in tools. Custom and MCP tools retain their own renderers.
 The center column intentionally omits persistent side regions.
