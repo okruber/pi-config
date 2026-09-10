@@ -17,6 +17,8 @@ import {
   EdgeOutputComponent,
   ToolLedgerComponent,
   type BuiltInToolName,
+  type DetailInput,
+  type ToolResultContent,
 } from './osseo-call-line.ts'
 
 type AnyToolDefinition = ToolDefinition<any, any, any>
@@ -44,6 +46,19 @@ export function createRuntimeToolDefinitions(
   ]
 }
 
+// Pi shares rendererState between the call and result render slots. The result
+// renderer marks its presence here; the call renderer reads it at paint time,
+// which is always after this pass's renderResult has run.
+type OsseoRendererState = {
+  osseoResultPresent?: boolean
+  startedAt?: number
+  endedAt?: number
+}
+
+function bashElapsedMs(state: OsseoRendererState, isPartial: boolean): number | undefined {
+  return isPartial && typeof state.startedAt === 'number' ? Date.now() - state.startedAt : undefined
+}
+
 function isBuiltInToolName(name: string): name is BuiltInToolName {
   return BUILTIN_TOOL_NAMES.some((candidate) => candidate === name)
 }
@@ -59,28 +74,52 @@ export function decorateBuiltInTool(definition: AnyToolDefinition): AnyToolDefin
     ...definition,
     renderShell: 'self',
     renderCall(args, theme, context) {
+      const state = context.state as OsseoRendererState
       return new ToolLedgerComponent({
         name,
         args: args as Record<string, unknown>,
         isPartial: context.isPartial,
         isError: context.isError,
         theme,
+        expanded: context.expanded,
+        pending: {
+          isSettled: () => Boolean(state.osseoResultPresent),
+          snapshot: () => ({
+            name,
+            args: args as Record<string, unknown>,
+            result: undefined,
+            isPartial: true,
+            isError: context.isError,
+            elapsedMs: bashElapsedMs(state, context.isPartial),
+            sourcePath: theme.sourcePath,
+          }) satisfies DetailInput,
+        },
       })
     },
     renderResult(result, options, theme, context) {
-      const expanded = options.expanded
+      const state = context.state as OsseoRendererState
       const inner = originalResult
         ? originalResult(
             result,
-            expanded ? { ...options, expanded: true } : options,
+            options.expanded ? { ...options, expanded: true } : options,
             theme,
             context,
           )
         : undefined
+      state.osseoResultPresent = true
       return new EdgeOutputComponent({
         inner: inner as Component | undefined,
-        expanded,
+        expanded: options.expanded,
         theme,
+        detail: {
+          name,
+          args: context.args as Record<string, unknown>,
+          result: result as ToolResultContent,
+          isPartial: options.isPartial,
+          isError: context.isError,
+          elapsedMs: bashElapsedMs(state, options.isPartial),
+          sourcePath: theme.sourcePath,
+        } satisfies DetailInput,
       })
     },
   }

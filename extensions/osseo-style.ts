@@ -11,6 +11,11 @@ export const OSSEO_COLORS = {
   sageGrey: '#89897c',
   dustyBlue: '#8894a0',
   terracotta: '#a56148',
+  frameLine: '#d3ccc4',
+  framePendingLine: '#e0c3b0',
+  framePendingFill: '#f6ece6',
+  frameErrorLine: '#dcb4ac',
+  frameErrorFill: '#f3e0dc',
 } as const
 
 export type OsseoColorName = keyof typeof OSSEO_COLORS
