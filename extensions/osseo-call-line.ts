@@ -1,6 +1,6 @@
 import type { Theme } from '@earendil-works/pi-coding-agent'
 import type { Component } from '@earendil-works/pi-tui'
-import { stripTerminalSequences, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
+import { stripTerminalSequences, truncateToWidth } from '@earendil-works/pi-tui'
 import { hexToBg, hexToFg, resolveThemeVar, type OsseoColorName } from './osseo-style.ts'
 
 export const BUILTIN_TOOL_NAMES = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'] as const
@@ -9,27 +9,40 @@ export type ToolVisualState = 'pending' | 'success' | 'error'
 export type ToolSummary = { action: BuiltInToolName; subject: string }
 
 const ANSI_CLOSE = '\x1b[22m\x1b[27m\x1b[39m\x1b[49m'
-const STATE_COLOR_VAR: Record<ToolVisualState, OsseoColorName> = {
-  pending: 'terracotta',
-  success: 'mossGreen',
-  error: 'oxblood',
+export const STATE_COLOR_VAR: Record<ToolVisualState, OsseoColorName> = {
+  pending: 'signalOrange',
+  success: 'signalGreen',
+  error: 'signalRed',
 }
 
-export const TOOL_ACCENTS: Record<BuiltInToolName, string> = {
-  read: '#2072B2',
-  ls: '#2072B2',
-  bash: '#B85E14',
-  edit: '#8A6D00',
-  write: '#0B8C50',
-  grep: '#B4423C',
-  find: '#B4423C',
+const MUTED_VARS: Record<BuiltInToolName, OsseoColorName> = {
+  bash: 'sageGrey',
+  read: 'dustyBlue',
+  write: 'dustyBlue',
+  edit: 'dustyBlue',
+  grep: 'dustyBlue',
+  find: 'dustyBlue',
+  ls: 'dustyBlue',
+}
+
+function subjectFg(name: BuiltInToolName, sourcePath: string | undefined, text: string): string {
+  return hexToFg(resolveThemeVar(sourcePath, MUTED_VARS[name])) + text + '\x1b[39m'
+}
+
+function band(sourcePath: string | undefined, state: 'success' | 'error', text: string): string {
+  const fg = resolveThemeVar(sourcePath, state === 'success' ? 'mossGreen' : 'signalRed')
+  const bg = resolveThemeVar(sourcePath, state === 'success' ? 'toolSuccessBg' : 'toolErrorBg')
+  return `${hexToBg(bg)}${hexToFg(fg)}${text}${ANSI_CLOSE}`
+}
+
+function edgeLine(sourcePath: string | undefined): string {
+  return `${hexToFg(resolveThemeVar(sourcePath, 'mauveTaupe'))}│ \x1b[39m`
 }
 
 // omp rule: 3 lines collapsed. Live-tail scans only the trailing bytes so
 // per-tick cost stays bounded by the cap regardless of total output size.
 const DETAIL_TAIL_LINES = 3
 const TAIL_SCAN_BYTES = 2048
-const MIN_FRAME_WIDTH = 12
 
 export type ToolTheme = Pick<Theme, 'sourcePath' | 'fg' | 'bold'>
 
@@ -97,12 +110,12 @@ export function fitAnsi(text: string, width: number): string {
   return `${truncateToWidth(text, width, '')}${ANSI_CLOSE}`
 }
 
-function accentLine(hex: string, text: string): string {
-  return `${hexToFg(hex)}${text}\x1b[39m`
+function hintLine(text: string, sourcePath: string | undefined): string {
+  return `${hexToFg(resolveThemeVar(sourcePath, 'sageGrey'))}${text}\x1b[39m`
 }
 
-function hintLine(text: string, sourcePath: string | undefined): string {
-  return `${hexToFg(resolveThemeVar(sourcePath, 'mauveTaupe'))}${text}\x1b[39m`
+function pendingFg(sourcePath: string | undefined, text: string): string {
+  return `${hexToFg(resolveThemeVar(sourcePath, STATE_COLOR_VAR.pending))}${text}\x1b[39m`
 }
 
 function resultText(result: ToolResultContent | undefined): string {
@@ -145,19 +158,23 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`
 }
 
-function writeSizeLine(args: Record<string, unknown>, accent: string): string {
+function writeSizeText(args: Record<string, unknown>): string {
   const content = typeof args.content === 'string' ? args.content : ''
   const bytes = Buffer.byteLength(content)
   const lines = content.split('\n').length
-  return `${accentLine(accent, formatBytes(bytes))} · ${accentLine(accent, `${lines} ${lines === 1 ? 'line' : 'lines'}`)}`
+  return `${formatBytes(bytes)} · ${lines} ${lines === 1 ? 'line' : 'lines'}`
 }
 
-function readDetail(args: Record<string, unknown>, output: string): string[] {
+function readDetail(
+  args: Record<string, unknown>,
+  output: string,
+  sourcePath: string | undefined,
+): string[] {
   const lineCount = splitBodyLines(output).length
   const start = typeof args.offset === 'number' ? args.offset : 1
   const end =
     typeof args.limit === 'number' ? start + args.limit - 1 : start + Math.max(lineCount, 1) - 1
-  return [`${accentLine(TOOL_ACCENTS.read, `${lineCount} lines`)} · L${start}–${end}`]
+  return [band(sourcePath, 'success', `${lineCount} lines · L${start}–${end}`)]
 }
 
 function grepDetail(output: string, sourcePath: string | undefined): string[] {
@@ -166,9 +183,9 @@ function grepDetail(output: string, sourcePath: string | undefined): string[] {
     const match = /^([^:\n]+):(\d+):/.exec(line)
     if (match) locations.push(`${match[1]}:${match[2]}`)
   }
-  if (locations.length === 0) return [accentLine(TOOL_ACCENTS.grep, 'no matches')]
+  if (locations.length === 0) return [band(sourcePath, 'success', 'no matches')]
   const shown = locations.slice(0, 3)
-  const first = `${accentLine(TOOL_ACCENTS.grep, `${locations.length} matches`)} · first: ${shown[0]}`
+  const first = band(sourcePath, 'success', `${locations.length} matches · first: ${shown[0]}`)
   if (shown.length === 1) return [first]
   let rest = shown.slice(1).join(' · ')
   if (locations.length > 3) rest += ` ${hintLine(`… +${locations.length - 3} file`, sourcePath)}`
@@ -178,26 +195,27 @@ function grepDetail(output: string, sourcePath: string | undefined): string[] {
 function findDetail(output: string, sourcePath: string | undefined): string[] {
   const files = splitBodyLines(output)
   const shown = files.slice(0, 3)
-  let line = `${accentLine(TOOL_ACCENTS.find, `${files.length} files`)}`
-  if (shown.length > 0) line += ` · ${shown.join(' · ')}`
+  let text = `${files.length} files`
+  if (shown.length > 0) text += ` · ${shown.join(' · ')}`
+  let line = band(sourcePath, 'success', text)
   if (files.length > 3) line += ` ${hintLine(`… +${files.length - 3} more`, sourcePath)}`
   return [line]
 }
 
-function lsDetail(output: string): string[] {
+function lsDetail(output: string, sourcePath: string | undefined): string[] {
   const entries = splitBodyLines(output)
   const dirs = entries.filter((entry) => entry.endsWith('/')).length
-  return [`${accentLine(TOOL_ACCENTS.ls, `${entries.length} entries`)} · ${dirs} dirs`]
+  return [band(sourcePath, 'success', `${entries.length} entries · ${dirs} dirs`)]
 }
 
 function bashDetail(input: DetailInput, output: string): string[] {
   if (input.isPartial) {
     const elapsed = input.elapsedMs !== undefined ? ` · ${(input.elapsedMs / 1000).toFixed(1)} s` : ''
     const { lines } = countTail(output, DETAIL_TAIL_LINES)
-    return [accentLine(TOOL_ACCENTS.bash, `running${elapsed}`), ...lines]
+    return [pendingFg(input.sourcePath, `running${elapsed}`), ...lines]
   }
   const { lines, total } = countTail(output, DETAIL_TAIL_LINES)
-  if (lines.length === 0) return [accentLine(TOOL_ACCENTS.bash, 'no output')]
+  if (lines.length === 0) return [band(input.sourcePath, 'success', 'no output')]
   const detail = [...lines]
   if (total > lines.length) {
     detail.push(hintLine(`… +${total - lines.length} more`, input.sourcePath))
@@ -218,9 +236,8 @@ function editDetail(input: DetailInput, output: string): string[] {
   }
   if (changes.length === 0) return []
   const rows = changes.slice(0, 3).map((change) => {
-    const color = change.sign === '-' ? 'oxblood' : 'mossGreen'
     const prefix = change.sign === '-' ? '−' : '+'
-    return `${hexToFg(resolveThemeVar(input.sourcePath, color))}${prefix} ${change.text}\x1b[39m`
+    return band(input.sourcePath, change.sign === '-' ? 'error' : 'success', `${prefix} ${change.text}`)
   })
   if (changes.length > 3) rows.push(hintLine(`… +${changes.length - 3} more changes`, input.sourcePath))
   return rows
@@ -228,42 +245,41 @@ function editDetail(input: DetailInput, output: string): string[] {
 
 function errorDetail(output: string, sourcePath: string | undefined): string[] {
   const all = splitBodyLines(output)
-  if (all.length === 0) return [hintLine('failed', sourcePath)]
+  if (all.length === 0) return [band(sourcePath, 'error', 'failed')]
   const hasStatus = /^Command (exited with code \d+|aborted|timed out after \d+ seconds)$/.test(
     all[all.length - 1]!,
   )
   const body = hasStatus ? all.slice(0, -1) : all
   const statusLine = hasStatus ? all[all.length - 1] : undefined
   const bodyTail = body.slice(-2)
-  const rows = [...bodyTail]
+  const rows = bodyTail.map((line) => band(sourcePath, 'error', line))
   if (body.length > bodyTail.length) {
     rows.push(hintLine(`… +${body.length - bodyTail.length} more`, sourcePath))
   }
-  if (statusLine !== undefined) rows.push(statusLine)
-  return rows.length > 0 ? rows : [hintLine('failed', sourcePath)]
+  if (statusLine !== undefined) rows.push(hintLine(statusLine, sourcePath))
+  return rows.length > 0 ? rows : [band(sourcePath, 'error', 'failed')]
 }
 
 function pendingDetail(input: DetailInput): string[] {
-  const { name, args, elapsedMs } = input
-  const accent = TOOL_ACCENTS[name]
+  const { name, args, elapsedMs, sourcePath } = input
   if (name === 'bash') {
     const elapsed = elapsedMs !== undefined ? ` · ${(elapsedMs / 1000).toFixed(1)} s` : ''
-    return [accentLine(accent, `running${elapsed}`)]
+    return [pendingFg(sourcePath, `running${elapsed}`)]
   }
   if (name === 'edit') {
     const edits = Array.isArray(args.edits) ? args.edits.length : 1
-    return [accentLine(accent, `${edits} edit${edits === 1 ? '' : 's'} pending`)]
+    return [pendingFg(sourcePath, `${edits} edit${edits === 1 ? '' : 's'} pending`)]
   }
-  if (name === 'write') return [writeSizeLine(args, accent)]
+  if (name === 'write') return [pendingFg(sourcePath, writeSizeText(args))]
   if (name === 'read') {
     const start = typeof args.offset === 'number' ? args.offset : 1
     const end = typeof args.limit === 'number' ? start + args.limit - 1 : '…'
-    return [accentLine(accent, `reading · L${start}–${end}`)]
+    return [pendingFg(sourcePath, `reading · L${start}–${end}`)]
   }
   if (name === 'grep' || name === 'find') {
-    return [accentLine(accent, `searching · ${stringArg(args, 'path', '.')}`)]
+    return [pendingFg(sourcePath, `searching · ${stringArg(args, 'path', '.')}`)]
   }
-  return [accentLine(accent, `listing · ${stringArg(args, 'path', '.')}`)]
+  return [pendingFg(sourcePath, `listing · ${stringArg(args, 'path', '.')}`)]
 }
 
 export function buildToolDetail(input: DetailInput): string[] {
@@ -276,52 +292,24 @@ export function buildToolDetail(input: DetailInput): string[] {
     case 'edit':
       return editDetail(input, output)
     case 'read':
-      return readDetail(input.args, output)
+      return readDetail(input.args, output, input.sourcePath)
     case 'write':
-      return [writeSizeLine(input.args, TOOL_ACCENTS.write)]
+      return [band(input.sourcePath, 'success', writeSizeText(input.args))]
     case 'grep':
       return grepDetail(output, input.sourcePath)
     case 'find':
       return findDetail(output, input.sourcePath)
     case 'ls':
-      return lsDetail(output)
+      return lsDetail(output, input.sourcePath)
   }
 }
 
-export function frameDetail(
-  detail: string[],
-  state: ToolVisualState,
-  sourcePath: string | undefined,
-  width: number,
-): string[] {
-  if (detail.length === 0 || width < MIN_FRAME_WIDTH) return []
-  const contentWidth = width - 4
-  const innerWidth = contentWidth - 2
-  const borderColor = resolveThemeVar(
-    sourcePath,
-    state === 'pending' ? 'framePendingLine' : state === 'error' ? 'frameErrorLine' : 'frameLine',
+export function flatDetail(detail: string[], width: number, sourcePath: string | undefined): string[] {
+  if (width <= 0) return []
+  const inner = Math.max(1, width - 2)
+  return detail.map((line) =>
+    fitAnsi(`${edgeLine(sourcePath)}${line}`, width),
   )
-  const fillColor = resolveThemeVar(
-    sourcePath,
-    state === 'pending' ? 'framePendingFill' : state === 'error' ? 'frameErrorFill' : 'cloudPetal',
-  )
-  const barColor = resolveThemeVar(sourcePath, STATE_COLOR_VAR[state])
-  const border = hexToFg(borderColor)
-  const fill = hexToBg(fillColor)
-  const rail = `${border}│${ANSI_CLOSE}`
-  const top = `  ${border}╭${'─'.repeat(contentWidth)}╮${ANSI_CLOSE}`
-  const bottom = `  ${border}╰${'─'.repeat(contentWidth)}╯${ANSI_CLOSE}`
-  const rows = detail.map((line) => {
-    const content = fitAnsi(line, innerWidth)
-    const pad = innerWidth - visibleWidth(content)
-    return (
-      `  ${hexToFg(barColor)}▌${ANSI_CLOSE}` +
-      `${fill} ${content}${ANSI_CLOSE}` +
-      `${fill}${' '.repeat(Math.max(0, pad))}${ANSI_CLOSE}` +
-      rail
-    )
-  })
-  return [top, ...rows, bottom]
 }
 
 function argsKey(name: BuiltInToolName, args: Record<string, unknown>): string {
@@ -365,33 +353,14 @@ export class ToolLedgerComponent implements Component {
   render(width: number): string[] {
     if (width <= 0) return []
     const state = toolVisualState(this.input.isPartial, this.input.isError)
-    const showFrame =
-      this.input.pending !== undefined &&
-      this.input.expanded !== true &&
-      !this.input.pending.isSettled()
-    const pending = showFrame ? this.input.pending!.snapshot() : undefined
-    const key = JSON.stringify([
-      width,
-      state,
-      this.input.expanded ?? false,
-      showFrame,
-      pending !== undefined && pending.elapsedMs !== undefined
-        ? Math.floor(pending.elapsedMs / 1000)
-        : undefined,
-      pending !== undefined ? argsKey(pending.name, pending.args) : undefined,
-    ])
+    const key = JSON.stringify([width, state, argsKey(this.input.name, this.input.args)])
     if (key === this.cachedKey && this.cachedLines) return this.cachedLines
 
     const summary = summarizeToolCall(this.input.name, this.input.args)
     const symbol = `${hexToFg(resolveThemeVar(this.input.theme.sourcePath, STATE_COLOR_VAR[state]))}${toolStateSymbol(state)}\x1b[39m`
-    const action = `${hexToFg(TOOL_ACCENTS[this.input.name])}${this.input.theme.bold(summary.action)}\x1b[39m`
-    const subject = this.input.theme.fg(this.input.name === 'bash' ? 'muted' : 'accent', summary.subject)
+    const action = `${this.input.theme.bold(this.input.name)}\x1b[22m`
+    const subject = subjectFg(this.input.name, this.input.theme.sourcePath, summary.subject)
     const lines = [fitAnsi(`${symbol} ${action} ${subject}`, width)]
-    if (pending !== undefined) {
-      lines.push(
-        ...frameDetail(buildToolDetail(pending), state, this.input.theme.sourcePath, width),
-      )
-    }
     this.cachedKey = key
     this.cachedLines = lines
     return lines
@@ -436,9 +405,8 @@ export class EdgeOutputComponent implements Component {
     const key = JSON.stringify([width, detailKey(this.input.detail)])
     if (key === this.cachedKey && this.cachedLines) return this.cachedLines
     const detail = this.input.detail
-    const state = toolVisualState(detail.isPartial, detail.isError)
     this.cachedKey = key
-    this.cachedLines = frameDetail(buildToolDetail(detail), state, detail.sourcePath, width)
+    this.cachedLines = flatDetail(buildToolDetail(detail), width, detail.sourcePath)
     return this.cachedLines
   }
 
