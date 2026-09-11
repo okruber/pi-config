@@ -414,6 +414,27 @@ test('grep and find details cap preview rows and label the totals', () => {
   assert.equal(find.outputLabel, 'OUTPUT · 5 files')
 })
 
+test('detail builders use singular OUTPUT labels for 1-result tools', () => {
+  const read = buildToolDetail(settledDetail('read', { path: '/tmp/x.md' }, textResult(['one line'])))
+  assert.equal(read.outputLabel, 'OUTPUT · 1 line · L1–1')
+
+  const grep = buildToolDetail(
+    settledDetail('grep', { pattern: 'x', path: 'src' }, textResult(['f.ts:3: hit'])),
+  )
+  assert.equal(grep.outputLabel, 'OUTPUT · 1 match')
+
+  const find = buildToolDetail(settledDetail('find', { pattern: 'x' }, textResult(['a.ts'])))
+  assert.equal(find.outputLabel, 'OUTPUT · 1 file')
+
+  const ls = buildToolDetail(
+    settledDetail('ls', { path: '.' }, textResult(['dir1/', 'single.ts'])),
+  )
+  assert.equal(ls.outputLabel, 'OUTPUT · 2 entries · 1 dir')
+
+  const readEmpty = buildToolDetail(settledDetail('read', { path: '/tmp/x.md' }, textResult([])))
+  assert.equal(readEmpty.outputLabel, 'OUTPUT · 0 lines · L1–1')
+})
+
 test('pending detail derives from args for every tool', () => {
   const bash = buildToolDetail({
     name: 'bash', args: { command: 'npm test' }, result: undefined,

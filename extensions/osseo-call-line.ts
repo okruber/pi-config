@@ -201,7 +201,7 @@ function readDetail(
     typeof args.limit === 'number' ? start + args.limit - 1 : start + Math.max(lineCount, 1) - 1
   return {
     rows: previewRows(lines, PREVIEW_TEXT_LINES, { one: 'line', many: 'lines' }, sourcePath),
-    outputLabel: `OUTPUT · ${lineCount} lines · L${start}–${end}`,
+    outputLabel: `OUTPUT · ${countUnit(lineCount, 'line')} · L${start}–${end}`,
   }
 }
 
@@ -210,7 +210,7 @@ function grepDetail(output: string, sourcePath: string | undefined): ToolDetail 
   if (lines.length === 0) return { rows: [], outputLabel: 'OUTPUT · no matches' }
   return {
     rows: previewRows(lines, PREVIEW_TEXT_LINES, { one: 'match', many: 'matches' }, sourcePath),
-    outputLabel: `OUTPUT · ${lines.length} matches`,
+    outputLabel: `OUTPUT · ${countUnit(lines.length, 'match')}`,
   }
 }
 
@@ -218,7 +218,7 @@ function findDetail(output: string, sourcePath: string | undefined): ToolDetail 
   const files = splitBodyLines(output)
   return {
     rows: previewRows(files, PREVIEW_ENTRY_LINES, { one: '', many: '' }, sourcePath),
-    outputLabel: `OUTPUT · ${files.length} files`,
+    outputLabel: `OUTPUT · ${countUnit(files.length, 'file')}`,
   }
 }
 
@@ -227,7 +227,7 @@ function lsDetail(output: string, sourcePath: string | undefined): ToolDetail {
   const dirs = entries.filter((entry) => entry.endsWith('/')).length
   return {
     rows: previewRows(entries, PREVIEW_ENTRY_LINES, { one: '', many: '' }, sourcePath),
-    outputLabel: `OUTPUT · ${entries.length} entries · ${dirs} dirs`,
+    outputLabel: `OUTPUT · ${countUnit(entries.length, 'entry')} · ${countUnit(dirs, 'dir')}`,
   }
 }
 
@@ -247,7 +247,10 @@ function bashDetail(input: DetailInput, output: string): ToolDetail {
 }
 
 function countUnit(count: number, unit: string): string {
-  return `${count} ${unit}${count === 1 ? '' : 's'}`
+  if (count === 1) return `${count} ${unit}`
+  if (/[^aeiou]y$/.test(unit)) return `${count} ${unit.slice(0, -1)}ies`
+  if (/(?:ch|sh|s|x|z)$/.test(unit)) return `${count} ${unit}es`
+  return `${count} ${unit}s`
 }
 
 function editDetail(input: DetailInput, output: string): ToolDetail {
