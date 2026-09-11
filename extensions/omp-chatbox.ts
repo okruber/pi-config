@@ -6,6 +6,7 @@ import {
 } from '@earendil-works/pi-coding-agent'
 import type { Component, EditorTheme, TUI } from '@earendil-works/pi-tui'
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui'
+import { OSSEO_COLORS, resolveThemeVar } from './osseo-style.ts'
 
 const SEP = '›'
 const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]/g
@@ -15,6 +16,20 @@ const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]/g
 const STATUS_BRIDGE = Symbol.for('omp.footer.statuses.v1')
 
 type StatusBridge = { version: 1; getStatuses(): ReadonlyMap<string, string> }
+
+// Dock slots each prefer the theme's named signal var, then a legacy name,
+// then the literal signal hex (brick pi). A resolved value equal to the static
+// map means the theme did not redefine that name, so the next candidate is
+// tried. RAINBOW lives and dies here: the old hardcoded group foregrounds now
+// resolve through the osseo-bone vars with exact literal fallbacks.
+function resolveSlot(theme: any, names: string[], fallbackHex: string): string {
+  const sourcePath = (theme as any)?.sourcePath
+  for (const name of names) {
+    const value = resolveThemeVar(sourcePath, name as any)
+    if (value !== OSSEO_COLORS[name as keyof typeof OSSEO_COLORS]) return value
+  }
+  return fallbackHex
+}
 
 class EmptyFooter implements Component {
   render(): string[] {
@@ -87,17 +102,9 @@ function subscriptionLabel(ctx: ExtensionContext): string | undefined {
 // gets its own hue plus bold on the value, so neighbours stay separable on
 // a low-contrast parchment canvas.
 //
-// Group hues are painted directly (truecolor SGR) instead of through theme
-// tokens so the vivid rainbow here never leaks into markdown, diffs, or tool
-// output. Orange/yellow are deepened from the requested #F28322/#FEC20B,
-// which sit at 2.4:1 / 1.5:1 on the cream canvas.
-const RAINBOW = {
-  red: '#D92534',
-  blue: '#2072B2',
-  green: '#0B8C50',
-  orange: '#B85E14',
-  yellow: '#8A6D00',
-}
+// Group hues resolve through the theme's signal vars (brick π, signal blue
+// model, signal green thinking, signal orange path) and fall back to the
+// literal hexes below when the theme does not define them.
 
 function sgrFg(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -121,13 +128,18 @@ function quiet(theme: StatusTheme, color: string, text: string): string {
   return theme.fg(color as any, text)
 }
 
-function contextSegment(ctx: ExtensionContext): string {
+function contextSegment(
+  ctx: ExtensionContext,
+  slotRed: string,
+  slotOrange: string,
+  ctxCaution: string,
+): string {
   const text = formatContext(ctx)
   const percent = ctx.getContextUsage()?.percent ?? null
   if (percent === null) return `\x1b[2m${text}\x1b[22m`
-  if (percent >= 90) return vivid(RAINBOW.red, text)
-  if (percent >= 70) return vivid(RAINBOW.orange, text)
-  return vivid(RAINBOW.yellow, text)
+  if (percent >= 90) return vivid(slotRed, text)
+  if (percent >= 70) return vivid(slotOrange, text)
+  return vivid(ctxCaution, text)
 }
 
 function fitStatusLine(left: string, right: string, width: number, border: (text: string) => string): string {
@@ -219,16 +231,24 @@ export default function (pi: ExtensionAPI) {
         const cost = totalCost(ctx)
         const usingSub = ctx.model ? (ctx.modelRegistry as any).isUsingOAuth?.(ctx.model) : false
 
+        const slotPi = resolveSlot(theme, ['signalRed', 'oxblood'], '#B7333D')
+        const slotModel = resolveSlot(theme, ['signalBlue', 'accent'], '#2072B2')
+        const slotThink = resolveSlot(theme, ['signalGreen', 'mossGreen'], '#0B8C50')
+        const slotPath = resolveSlot(theme, ['signalOrange', 'warning'], '#B85E14')
+        const slotRed = resolveSlot(theme, ['signalRed'], '#B7333D')
+        const slotOrange = resolveSlot(theme, ['signalOrange'], '#B85E14')
+        const ctxCaution = resolveSlot(theme, ['signalYellow'], '#8A6D00')
+
         const parts = [
-          pad(vivid(RAINBOW.red, 'π')),
-          pad(`${vivid(RAINBOW.blue, '✺')} ${vivid(RAINBOW.blue, modelLabel(ctx))}`),
-          pad(vivid(RAINBOW.green, `● ${thinking === 'off' ? 'off' : thinking}`)),
+          pad(vivid(slotPi, 'π')),
+          pad(`${vivid(slotModel, '✺')} ${vivid(slotModel, modelLabel(ctx))}`),
+          pad(vivid(slotThink, `● ${thinking === 'off' ? 'off' : thinking}`)),
           pad(
-            `${quiet(theme, 'dim', '⌘')} ${vivid(RAINBOW.orange, compactPath(ctx.cwd))}${
+            `${quiet(theme, 'dim', '⌘')} ${vivid(slotPath, compactPath(ctx.cwd))}${
               branch ? quiet(theme, 'muted', `:${branch}`) : ''
             }`,
           ),
-          pad(contextSegment(ctx)),
+          pad(contextSegment(ctx, slotRed, slotOrange, ctxCaution)),
         ]
 
         if (cost > 0 || usingSub) {
