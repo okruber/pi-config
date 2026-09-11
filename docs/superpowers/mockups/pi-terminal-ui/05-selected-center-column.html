@@ -8,8 +8,12 @@
     --mauve: #907062;
     --cloud: #fbf9f7;
     --sage: #89897c;
-    --blue: #52677d;
-    --terra: #a56148;
+    --blue: #8894a0;
+    --sig-red: #B7333D;
+    --sig-orange: #B85E14;
+    --sig-yellow: #8A6D00;
+    --sig-green: #0B8C50;
+    --sig-blue: #2072B2;
   }
   .selected-wrap { max-width: 1080px; margin: 0 auto; }
   .mockup { border-color: #c8bbb4; box-shadow: 0 16px 45px rgba(4, 22, 42, .12); }
@@ -21,29 +25,31 @@
     font: 13px/1.58 "SFMono-Regular", Consolas, monospace;
     text-align: left;
   }
-  .user-band { margin-bottom: 20px; padding: 11px 13px; border-left: 3px solid var(--oxblood); background: #ddd4ce; }
-  .user-label { margin-bottom: 4px; color: var(--oxblood); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+  .user-band { margin-bottom: 20px; padding: 11px 13px; background: #ddd4ce; }
   .thinking { margin: 0 0 18px; padding-left: 11px; border-left: 1px solid var(--mauve); color: #5f6570; font-style: italic; }
   .assistant { margin: 0 0 17px; }
   .assistant h4 { margin: 0 0 5px; color: var(--oxblood); font: 800 14px/1.5 inherit; }
   .tool { margin: 13px 0 19px; }
   .tool-head { font-weight: 800; }
-  .ok { color: var(--moss); }
-  .wait { color: var(--terra); }
-  .fail { color: var(--oxblood); }
+  .ok { color: var(--sig-green); }
+  .wait { color: var(--sig-orange); }
+  .fail { color: var(--sig-red); }
   .path { color: var(--blue); }
-  .meta { color: #6b6d71; }
-  .output { margin-top: 5px; padding-left: 11px; border-left: 2px solid var(--mauve); white-space: pre-wrap; }
-  .diff-del { color: var(--oxblood); }
-  .diff-add { color: var(--moss); }
+  .edge-glyph { color: var(--mauve); }
+  .edge-line { color: var(--navy); white-space: nowrap; overflow: hidden; }
+  .hint { color: var(--sage); }
+  .output { margin-top: 5px; }
+  .diff-del { color: var(--sig-red); background: #efe0dc; }
+  .diff-add { color: var(--moss); background: #e1e6de; }
   .dock { margin-top: 28px; }
   .powerline { display: flex; overflow: hidden; white-space: nowrap; color: var(--cloud); font-weight: 800; }
   .segment { padding: 3px 8px; }
-  .seg-red { background: var(--oxblood); }
-  .seg-blue { background: #6f7f90; }
-  .seg-green { background: var(--moss); }
-  .seg-terra { background: var(--terra); }
+  .seg-red { background: #B7333D; }
+  .seg-blue { background: #2072B2; }
+  .seg-green { background: #0B8C50; }
+  .seg-terra { background: #B85E14; }
   .seg-navy { background: var(--navy); }
+  .seg-yellow { background: #8A6D00; }
   .editor { min-height: 58px; padding: 10px 12px; background: var(--cloud); border-left: 3px solid var(--oxblood); }
   .prompt { color: var(--oxblood); font-weight: 800; }
   .footer { display: flex; justify-content: space-between; padding-top: 5px; color: #73747a; font-size: 12px; }
@@ -64,7 +70,6 @@
     <div class="mockup-header" data-eid="session-masthead"><span>LIVE SESSION · PI</span><span>120 columns</span></div>
     <div class="terminal">
       <div class="user-band" data-eid="user-message">
-        <div class="user-label" data-eid="user-label">YOU</div>
         Inspect the terminal theme, run its contract tests, and correct the tool title token without changing unrelated settings.
       </div>
 
@@ -77,25 +82,30 @@
 
       <div class="tool">
         <div class="tool-head"><span class="ok">✓</span> read <span class="path">themes/bone.json</span></div>
-        <div class="output">89 lines returned.<br><span class="meta">Collapsed · ctrl+o expands output</span></div>
+        <div class="edge-line"><span class="edge-glyph">│ </span>"oxblood": "#6a3026",</div>
+        <div class="edge-line"><span class="edge-glyph">│ </span>"bone": "#e9e3df",</div>
+        <div class="edge-line"><span class="edge-glyph">│ </span>… 87 more lines (ctrl+o)</div>
+        <div class="hint">OUTPUT · 89 lines · L1–89</div>
       </div>
 
       <div class="tool">
-        <div class="tool-head"><span class="wait">◌</span> bash <span class="meta">node --test tests/pi-terminal-ui.test.ts</span></div>
-        <div class="output"><span class="wait">Running for 1.4 s</span></div>
+        <div class="tool-head"><span class="wait">◌</span> bash <span class="path">node --test tests/pi-terminal-ui.test.ts</span></div>
+        <div class="edge-line"><span class="edge-glyph">│ </span>running · 1.4 s</div>
       </div>
 
       <div class="assistant">The failing assertion confirms that the title uses the muted role instead of the main text role.</div>
 
       <div class="tool">
         <div class="tool-head"><span class="ok">✓</span> edit <span class="path">themes/bone.json</span></div>
-        <div class="output"><span class="diff-del">−  "toolTitle": "sageGrey"</span><br><span class="diff-add">+  "toolTitle": "deepNavy"</span></div>
-        <div class="meta">1 addition and 1 removal</div>
+        <div class="diff-del"><span class="edge-glyph">│ </span>−  "toolTitle": "sageGrey"</div>
+        <div class="diff-add"><span class="edge-glyph">│ </span>+  "toolTitle": "deepNavy"</div>
+        <div class="hint">OUTPUT · 1 addition and 1 removal</div>
       </div>
 
       <div class="tool">
-        <div class="tool-head"><span class="fail">×</span> bash <span class="meta">python3 -m json.tool themes/bone.json</span></div>
-        <div class="output"><span class="fail">Expected property name on line 31.</span></div>
+        <div class="tool-head"><span class="fail">×</span> bash <span class="path">python3 -m json.tool themes/bone.json</span></div>
+        <div class="edge-line"><span class="edge-glyph">│ </span><span class="fail">Expected property name on line 31.</span></div>
+        <div class="edge-line"><span class="edge-glyph">│ </span><span class="hint">Command exited with code 1</span></div>
       </div>
 
       <div class="assistant">
@@ -109,7 +119,7 @@
           <span class="segment seg-blue">✺ qwen 3.6</span>
           <span class="segment seg-green">● high</span>
           <span class="segment seg-terra">⌘ ~/pi-config:pi-terminal-ui</span>
-          <span class="segment seg-navy">31%</span>
+          <span class="segment seg-yellow">31%</span>
         </div>
         <div class="editor" data-eid="editor-body"><span class="prompt">›</span> Fix the JSON syntax error and rerun validation.</div>
         <div class="footer" data-eid="editor-footer"><span>esc interrupts · ctrl+o expands · / commands</span><span>1.2k tok/s</span></div>

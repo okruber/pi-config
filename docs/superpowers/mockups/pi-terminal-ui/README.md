@@ -6,6 +6,8 @@ The fragments are designed for the Superpowers visual companion. The companion s
 
 ## Selected direction
 
+Iteration 1 approval (2026-08-26): flat ledger with a signal-colored symbol, a mauve edge carrying content preview lines, a Sage `OUTPUT · <meta>` row, and bands reserved for diff rows only. The user message renders as a quiet raised field with no label and no edge. Dock slots follow signal-red / signal-blue / signal-green / signal-orange with a yellow→orange→red context threshold.
+
 - `01-tool-call-grammar.html`: Inline ledger.
 - `02-expanded-output-treatment.html`: Edge only.
 - `03-message-hierarchy.html`: Editorial page.
