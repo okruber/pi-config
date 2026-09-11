@@ -7,9 +7,8 @@ import { visibleWidth, type Component } from '@earendil-works/pi-tui'
 import {
   EdgeOutputComponent,
   ToolLedgerComponent,
-  TOOL_ACCENTS,
   buildToolDetail,
-  frameDetail,
+  flatDetail,
   summarizeToolCall,
   toolStateSymbol,
   toolVisualState,
@@ -30,7 +29,7 @@ import osseoTranscriptExtension from '../extensions/osseo-transcript.ts'
 const theme = {
   sourcePath: undefined,
   fg: (_name: string, text: string) => text,
-  bold: (text: string) => `\x1b[1m${text}\x1b[22m`,
+  bold: (text: string) => `\x1b[1m${hexToFg(OSSEO_COLORS.deepNavy)}${text}\x1b[22m\x1b[39m`,
 } as any
 
 function textResult(lines: string[], details?: Record<string, unknown>): ToolResultContent {
@@ -76,12 +75,13 @@ function pendingSource(
   }
 }
 
-function accentOf(name: DetailInput['name']): string {
-  return hexToFg(TOOL_ACCENTS[name])
-}
-
-const OX_FG = hexToFg(OSSEO_COLORS.oxblood)
-const MOSS_FG = hexToFg(OSSEO_COLORS.mossGreen)
+const ANSI_CLOSE = '\x1b[22m\x1b[27m\x1b[39m\x1b[49m'
+const PENDING_FG = hexToFg(OSSEO_COLORS.signalOrange)
+const SUCCESS_STATE_FG = hexToFg(OSSEO_COLORS.signalGreen)
+const ERROR_STATE_FG = hexToFg(OSSEO_COLORS.signalRed)
+const SAGE_FG = hexToFg(OSSEO_COLORS.sageGrey)
+const BAND_SUCCESS = `${hexToBg(OSSEO_COLORS.toolSuccessBg)}${hexToFg(OSSEO_COLORS.mossGreen)}`
+const BAND_ERROR = `${hexToBg(OSSEO_COLORS.toolErrorBg)}${hexToFg(OSSEO_COLORS.signalRed)}`
 
 test('tool state maps to pending, success, and error', () => {
   assert.equal(toolVisualState(true, false), 'pending')
@@ -148,9 +148,9 @@ test('subjects normalize control characters, newlines, and runs of spaces', () =
 
 test('ledger renders one width-safe line per state color', () => {
   const cases = [
-    { isPartial: true, isError: false, glyph: '◌', sgr: '\x1b[38;2;165;97;72m' },
-    { isPartial: false, isError: false, glyph: '✓', sgr: '\x1b[38;2;62;71;57m' },
-    { isPartial: false, isError: true, glyph: '✗', sgr: '\x1b[38;2;106;48;38m' },
+    { isPartial: true, isError: false, glyph: '◌', sgr: PENDING_FG },
+    { isPartial: false, isError: false, glyph: '✓', sgr: SUCCESS_STATE_FG },
+    { isPartial: false, isError: true, glyph: '✗', sgr: ERROR_STATE_FG },
   ] as const
   for (const { isPartial, isError, glyph, sgr } of cases) {
     const lines = new ToolLedgerComponent({
@@ -214,16 +214,29 @@ test('expanded edge renderer prefixes every inner line with the gutter', () => {
   }
 })
 
-test('collapsed edge renderer frames the detail and drops passthrough', () => {
+test('collapsed edge renderer shows the flat detail and drops passthrough', () => {
   const lines = new EdgeOutputComponent({
     inner: new StubComponent(['plain result']),
     expanded: false,
     theme,
     detail: settledDetail('read', { path: '/tmp/x.md' }, textResult(['a', 'b', 'c'])),
   }).render(80)
-  assert.ok(lines.length > 1)
-  assert.ok(lines.some((line) => line.includes('3 lines') && line.includes('L1–3')))
+  assert.equal(lines.length, 1)
+  assert.ok(lines[0]!.includes('3 lines') && lines[0]!.includes('L1–3'))
+  assert.ok(lines[0]!.includes('│'))
+  assert.ok(lines.every((line) => !/[╭╮╰╯▌]/.test(line)))
   assert.ok(!lines.includes('plain result'))
+})
+
+test('flatDetail prefixes the mauve edge and closes every line', () => {
+  const lines = flatDetail(['alpha', 'beta'], 60, undefined)
+  assert.equal(lines.length, 2)
+  for (const line of lines) {
+    assert.ok(line.includes(`${hexToFg(OSSEO_COLORS.mauveTaupe)}│ \x1b[39m`))
+    assert.ok(line.endsWith(ANSI_CLOSE))
+    assert.ok(visibleWidth(line) <= 60)
+  }
+  assert.deepEqual(flatDetail(['x'], 0, undefined), [])
 })
 
 test('collapsed edge renderer without detail renders nothing', () => {
@@ -293,17 +306,17 @@ test('resolveThemeVar falls back to the palette for unknown vars and broken file
   assert.equal(resolveThemeVar(partial, 'mossGreen'), OSSEO_COLORS.mossGreen)
 })
 
-test('detail builders pick the per-tool preview', () => {
+test('detail builders band the per-tool preview', () => {
   const read = buildToolDetail(settledDetail('read', { path: '/tmp/x.md' }, textResult(['a', 'b', 'c'])))
-  assert.deepEqual(read, [`${accentOf('read')}3 lines\x1b[39m · L1–3`])
+  assert.deepEqual(read, [`${BAND_SUCCESS}3 lines · L1–3${ANSI_CLOSE}`])
 
   const readRange = buildToolDetail(
     settledDetail('read', { path: '/tmp/x.md', offset: 10, limit: 5 }, textResult(['a', 'b', 'c'])),
   )
-  assert.deepEqual(readRange, [`${accentOf('read')}3 lines\x1b[39m · L10–14`])
+  assert.deepEqual(readRange, [`${BAND_SUCCESS}3 lines · L10–14${ANSI_CLOSE}`])
 
   const write = buildToolDetail(settledDetail('write', { path: 'notes.md', content: 'a\nb' }, textResult([])))
-  assert.deepEqual(write, [`${accentOf('write')}3 B\x1b[39m · ${accentOf('write')}2 lines\x1b[39m`])
+  assert.deepEqual(write, [`${BAND_SUCCESS}3 B · 2 lines${ANSI_CLOSE}`])
   const grep = buildToolDetail(
     settledDetail('grep', { pattern: 'x', path: 'src' }, textResult([
       'osseo-call-line.ts:118: renderResult',
@@ -312,7 +325,7 @@ test('detail builders pick the per-tool preview', () => {
     ])),
   )
   assert.deepEqual(grep, [
-    `${accentOf('grep')}3 matches\x1b[39m · first: osseo-call-line.ts:118`,
+    `${BAND_SUCCESS}3 matches · first: osseo-call-line.ts:118${ANSI_CLOSE}`,
     'osseo-call-line.ts:121 · osseo-transcript.ts:44',
   ])
 
@@ -320,13 +333,13 @@ test('detail builders pick the per-tool preview', () => {
     settledDetail('find', { pattern: 'osseo', path: 'ext' }, textResult(['osseo-style.ts', 'osseo-call-line.ts', 'osseo-transcript.ts'])),
   )
   assert.deepEqual(find, [
-    `${accentOf('find')}3 files\x1b[39m · osseo-style.ts · osseo-call-line.ts · osseo-transcript.ts`,
+    `${BAND_SUCCESS}3 files · osseo-style.ts · osseo-call-line.ts · osseo-transcript.ts${ANSI_CLOSE}`,
   ])
 
   const ls = buildToolDetail(
     settledDetail('ls', { path: '.' }, textResult(['a.ts', 'b.ts', 'dir1/', 'dir2/', 'e.md'])),
   )
-  assert.deepEqual(ls, [`${accentOf('ls')}5 entries\x1b[39m · 2 dirs`])
+  assert.deepEqual(ls, [`${BAND_SUCCESS}5 entries · 2 dirs${ANSI_CLOSE}`])
 })
 
 test('bash settled detail shows the last three lines and a truncation hint', () => {
@@ -337,13 +350,13 @@ test('bash settled detail shows the last three lines and a truncation hint', () 
   assert.equal(detail[1], 'line 9')
   assert.equal(detail[2], 'line 10')
   assert.ok(detail[3]!.includes('… +7 more'))
-  assert.ok(detail[3]!.includes('\x1b[38;2;144;112;98m'))
+  assert.ok(detail[3]!.includes(SAGE_FG))
 
   const short = buildToolDetail(settledDetail('bash', { command: 'npm test' }, textResult(['only line'])))
   assert.deepEqual(short, ['only line'])
 
   const empty = buildToolDetail(settledDetail('bash', { command: 'true' }, textResult([])))
-  assert.deepEqual(empty, [`${accentOf('bash')}no output\x1b[39m`])
+  assert.deepEqual(empty, [`${BAND_SUCCESS}no output${ANSI_CLOSE}`])
 })
 
 test('edit settled detail caps changes and hints the rest', () => {
@@ -355,8 +368,8 @@ test('edit settled detail caps changes and hints the rest', () => {
     settledDetail('edit', { path: 'a.ts' }, textResult([], { diff: changes.join('\n') })),
   )
   assert.equal(detail.length, 4)
-  assert.ok(detail[0]!.startsWith(`${OX_FG}− old 1\x1b[39m`))
-  assert.ok(detail[1]!.startsWith(`${MOSS_FG}+ new 1\x1b[39m`))
+  assert.ok(detail[0]!.startsWith(`${BAND_ERROR}− old 1${ANSI_CLOSE}`))
+  assert.ok(detail[1]!.startsWith(`${BAND_SUCCESS}+ new 1${ANSI_CLOSE}`))
   assert.ok(detail[3]!.includes('… +7 more changes'))
 })
 
@@ -380,44 +393,44 @@ test('pending detail derives from args for every tool', () => {
     name: 'bash', args: { command: 'npm test' }, result: undefined,
     isPartial: true, isError: false, elapsedMs: 2100, sourcePath: undefined,
   })
-  assert.deepEqual(bash, [`${accentOf('bash')}running · 2.1 s\x1b[39m`])
+  assert.deepEqual(bash, [`${PENDING_FG}running · 2.1 s\x1b[39m`])
 
   const edit = buildToolDetail({
     name: 'edit', args: { path: 'a.ts', edits: [{ oldText: 'x', newText: 'y' }, { oldText: 'p', newText: 'q' }] },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(edit, [`${accentOf('edit')}2 edits pending\x1b[39m`])
+  assert.deepEqual(edit, [`${PENDING_FG}2 edits pending\x1b[39m`])
 
   const write = buildToolDetail({
     name: 'write', args: { path: 'n.md', content: 'hello' },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(write, [`${accentOf('write')}5 B\x1b[39m · ${accentOf('write')}1 line\x1b[39m`])
+  assert.deepEqual(write, [`${PENDING_FG}5 B · 1 line\x1b[39m`])
 
   const read = buildToolDetail({
     name: 'read', args: { path: 'x.md', offset: 4, limit: 10 },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(read, [`${accentOf('read')}reading · L4–13\x1b[39m`])
+  assert.deepEqual(read, [`${PENDING_FG}reading · L4–13\x1b[39m`])
 
   const grep = buildToolDetail({
     name: 'grep', args: { pattern: 'x', path: 'src' },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(grep, [`${accentOf('grep')}searching · src\x1b[39m`])
+  assert.deepEqual(grep, [`${PENDING_FG}searching · src\x1b[39m`])
 
   const ls = buildToolDetail({
     name: 'ls', args: { path: 'tests/' },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(ls, [`${accentOf('ls')}listing · tests/\x1b[39m`])
+  assert.deepEqual(ls, [`${PENDING_FG}listing · tests/\x1b[39m`])
 })
 
-test('error detail shows the failure note and the exit code line', () => {
+test('error detail bands the failure body and keeps the status line sage', () => {
   const editError = buildToolDetail(
     settledDetail('edit', { path: 'a.ts' }, textResult(['oldText match failed at line 118']), { isError: true }),
   )
-  assert.deepEqual(editError, ['oldText match failed at line 118'])
+  assert.deepEqual(editError, [`${BAND_ERROR}oldText match failed at line 118${ANSI_CLOSE}`])
 
   const bashError = buildToolDetail(
     settledDetail(
@@ -427,7 +440,10 @@ test('error detail shows the failure note and the exit code line', () => {
       { isError: true },
     ),
   )
-  assert.deepEqual(bashError, ['boom', 'Command exited with code 2'])
+  assert.deepEqual(bashError, [
+    `${BAND_ERROR}boom${ANSI_CLOSE}`,
+    `${SAGE_FG}Command exited with code 2\x1b[39m`,
+  ])
 
   const longBashError = buildToolDetail(
     settledDetail(
@@ -441,7 +457,9 @@ test('error detail shows the failure note and the exit code line', () => {
   assert.ok(longBashError[0]!.includes('l3'))
   assert.ok(longBashError[1]!.includes('l4'))
   assert.ok(longBashError[2]!.includes('… +2 more'))
-  assert.equal(longBashError[3], 'Command exited with code 1')
+  assert.ok(longBashError[3]!.includes(SAGE_FG))
+  assert.ok(longBashError[3]!.includes('Command exited with code 1'))
+  assert.ok(!longBashError[3]!.includes(hexToBg(OSSEO_COLORS.toolErrorBg)))
 })
 
 test('bash pending detail live-tails the streamed output', () => {
@@ -453,70 +471,44 @@ test('bash pending detail live-tails the streamed output', () => {
       { isPartial: true, elapsedMs: 2100 },
     ),
   )
-  assert.deepEqual(detail, [`${accentOf('bash')}running · 2.1 s\x1b[39m`, 't2', 't3', 't4'])
+  assert.deepEqual(detail, [`${PENDING_FG}running · 2.1 s\x1b[39m`, 't2', 't3', 't4'])
 })
 
-test('frame borders, bar, and fill carry state colors', () => {
-  const rows = ['value one', 'value two']
+test('ledger names render bold in deep navy via theme.bold', () => {
   const cases = [
-    { state: 'success' as const, bar: '\x1b[38;2;62;71;57m', fill: '\x1b[48;2;251;249;247m', border: '\x1b[38;2;211;204;196m' },
-    { state: 'pending' as const, bar: '\x1b[38;2;165;97;72m', fill: '\x1b[48;2;246;236;230m', border: '\x1b[38;2;224;195;176m' },
-    { state: 'error' as const, bar: '\x1b[38;2;106;48;38m', fill: '\x1b[48;2;243;224;220m', border: '\x1b[38;2;220;180;172m' },
+    { name: 'read' as const, args: { path: 'x.md' } },
+    { name: 'bash' as const, args: { command: 'true' } },
+    { name: 'edit' as const, args: { path: 'a.ts' } },
+    { name: 'write' as const, args: { path: 'n.md' } },
+    { name: 'grep' as const, args: { pattern: 'x' } },
   ]
-  for (const { state, bar, fill, border } of cases) {
-    const lines = frameDetail(rows, state, undefined, 60)
-    assert.equal(lines.length, 4)
-    assert.ok(lines[0]!.startsWith(`  ${border}╭`))
-    assert.ok(lines[0]!.includes('╮'))
-    assert.ok(lines[3]!.includes('╰'))
-    assert.ok(lines[3]!.includes('╯'))
-    assert.ok(lines[1]!.includes(`${bar}▌`))
-    assert.ok(lines[1]!.includes(fill))
-    assert.ok(lines[1]!.includes('│'))
-    for (const line of lines) assert.ok(visibleWidth(line) <= 60)
-  }
-})
-
-test('frame returns nothing below the minimum width and for empty detail', () => {
-  assert.deepEqual(frameDetail(['x'], 'success', undefined, 11), [])
-  assert.deepEqual(frameDetail([], 'success', undefined, 60), [])
-})
-
-test('ledger names render bold in their identity accent', () => {
-  const cases = [
-    { name: 'read' as const, sgr: '\x1b[38;2;32;114;178m' },
-    { name: 'bash' as const, sgr: '\x1b[38;2;184;94;20m' },
-    { name: 'edit' as const, sgr: '\x1b[38;2;138;109;0m' },
-    { name: 'write' as const, sgr: '\x1b[38;2;11;140;80m' },
-    { name: 'grep' as const, sgr: '\x1b[38;2;180;66;60m' },
-  ]
-  for (const { name, sgr } of cases) {
+  for (const { name, args } of cases) {
     const lines = new ToolLedgerComponent({
       name,
-      args: { path: 'x.md', command: 'true', pattern: 'x' },
+      args,
       isPartial: false,
       isError: false,
       theme,
     }).render(80)
-    assert.ok(lines[0]!.includes(`${sgr}\x1b[1m${name}\x1b[22m\x1b[39m`))
+    assert.ok(lines[0]!.includes(`\x1b[1m${hexToFg(OSSEO_COLORS.deepNavy)}${name}\x1b[22m\x1b[39m`))
+    assert.ok(visibleWidth(lines[0]!) <= 80)
   }
 })
 
-test('ledger appends the pending frame only before a result exists', () => {
+test('ledger renders one line; pending detail flows through the edge component', () => {
+  const pendingArgs = { path: 'a.ts', edits: [{ oldText: 'x', newText: 'y' }] }
   const ledger = new ToolLedgerComponent({
     name: 'edit',
-    args: { path: 'a.ts', edits: [{ oldText: 'x', newText: 'y' }] },
+    args: pendingArgs,
     isPartial: true,
     isError: false,
     theme,
     expanded: false,
-    pending: pendingSource('edit', { path: 'a.ts', edits: [{ oldText: 'x', newText: 'y' }] }),
+    pending: pendingSource('edit', pendingArgs),
   })
   const lines = ledger.render(80)
-  assert.equal(lines.length, 4)
+  assert.equal(lines.length, 1)
   assert.ok(lines[0]!.includes('edit'))
-  assert.ok(lines[1]!.includes('╭'))
-  assert.ok(lines[2]!.includes('1 edit pending'))
 
   const settledLedger = new ToolLedgerComponent({
     name: 'edit',
@@ -539,6 +531,28 @@ test('ledger appends the pending frame only before a result exists', () => {
     pending: pendingSource('edit', { path: 'a.ts' }),
   })
   assert.equal(expandedLedger.render(80).length, 1)
+
+  const pendingDetail: DetailInput = {
+    name: 'edit',
+    args: pendingArgs,
+    result: undefined,
+    isPartial: true,
+    isError: false,
+    elapsedMs: undefined,
+    sourcePath: undefined,
+  }
+  const edge = new EdgeOutputComponent({
+    inner: undefined,
+    expanded: false,
+    theme,
+    detail: pendingDetail,
+  })
+  const rows = edge.render(80)
+  assert.equal(rows.length, 1)
+  assert.ok(rows[0]!.includes('1 edit pending'))
+  assert.ok(rows[0]!.includes('│'))
+  assert.ok(rows[0]!.includes(PENDING_FG))
+  assert.ok(rows[0]!.endsWith(ANSI_CLOSE))
 })
 
 test('edge and ledger renders cache on width and content version', () => {
@@ -554,7 +568,7 @@ test('edge and ledger renders cache on width and content version', () => {
   assert.notDeepEqual(first, changed)
 })
 
-test('ledger and framed detail stay inside every supplied width', () => {
+test('ledger and flat detail stay inside every supplied width', () => {
   for (const width of [1, 2, 10, 12, 40, 120]) {
     const rows = [
       ...new ToolLedgerComponent({
