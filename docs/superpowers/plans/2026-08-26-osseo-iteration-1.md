@@ -250,7 +250,48 @@ git commit -m "osseo: update tests for flat geometry and signal slots"
 
 ---
 
-### Task 6: Re-record mockups and reference
+### Task 6: OUTPUT label row replaces banded meta (rework)
+
+**Files:**
+- Modify: `extensions/osseo-call-line.ts`
+- Modify: `tests/osseo-call-line.test.ts`
+
+Controller ruling: bands are restricted to diff add/del rows. Meta rows and error-content rows lose band fills entirely. Reworks the detail shape approved in chat after Tasks 2 and 5.
+
+- [ ] **Step 1: New detail structure**
+
+Change `buildToolDetail` to return a structure instead of a string array:
+
+```typescript
+export type ToolDetail = { rows: string[]; outputLabel?: string }
+```
+
+- [ ] **Step 2: Rewire detail builders**
+
+- `readDetail`, `grepDetail`, `findDetail`, `lsDetail`, and the write size: move the meta summary into `outputLabel` (`OUTPUT · 89 lines · L1–89`, `OUTPUT · 12 matches`, and so on). `rows` is empty for them.
+- `bashDetail`: settled tails stay in `rows`; `no output` moves to `outputLabel`; pending `running · N s` stays in `rows`.
+- `editDetail`: diff add/del bands stay in `rows` (the only banded rows); the change count moves to `outputLabel` (`OUTPUT · 1 addition and 1 removal`).
+- `errorDetail`: body tail rows render in Signal red foreground with no background band; the exit-status line and `… +N more` hints stay plain Sage rows.
+- `pendingDetail`: all rows, no label.
+
+- [ ] **Step 3: flatDetail handles the structure**
+
+`flatDetail` accepts `ToolDetail`: edge-prefix every `rows` entry, then append `outputLabel` as one unedged line painted sage (`hintLine` color). Keep the zero-width guard.
+
+- [ ] **Step 4: Update tests to the OUTPUT-row shape**
+
+Adjust the assertions added in Task 5: meta summaries are asserted as one unedged `OUTPUT · …` Sage line; error bodies carry Signal red foreground and no `toolErrorBg`; only diff rows carry `toolSuccessBg`/`toolErrorBg`. Run `bash tests/run-osseo-tests.sh` until green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add extensions/osseo-call-line.ts tests/osseo-call-line.test.ts
+git commit -m "osseo: OUTPUT label row replaces banded meta"
+```
+
+---
+
+### Task 7: Re-record mockups and reference
 
 **Files:**
 - Modify: `docs/superpowers/mockups/pi-terminal-ui/01-tool-call-grammar.html`
@@ -271,7 +312,7 @@ git commit -m "osseo: mockups record the approved iteration 1 target"
 
 ---
 
-### Task 7: Isolate and live-verify
+### Task 8: Isolate and live-verify
 
 **Files:** none (verification task)
 
