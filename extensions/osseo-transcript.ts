@@ -48,11 +48,11 @@ export function createRuntimeToolDefinitions(
 
 // Pi shares rendererState between the call and result render slots. The result
 // renderer marks its presence here; the call renderer reads it at paint time,
-// which is always after this pass's renderResult has run.
+// which is always after this pass's renderResult has run. startedAt is stamped
+// by the call renderer once execution starts, mirroring Pi's own shell renderer.
 type OsseoRendererState = {
   osseoResultPresent?: boolean
   startedAt?: number
-  endedAt?: number
 }
 
 function bashElapsedMs(state: OsseoRendererState, isPartial: boolean): number | undefined {
@@ -75,6 +75,9 @@ export function decorateBuiltInTool(definition: AnyToolDefinition): AnyToolDefin
     renderShell: 'self',
     renderCall(args, theme, context) {
       const state = context.state as OsseoRendererState
+      if (context.executionStarted && state.startedAt === undefined) {
+        state.startedAt = Date.now()
+      }
       return new ToolLedgerComponent({
         name,
         args: args as Record<string, unknown>,
@@ -82,18 +85,24 @@ export function decorateBuiltInTool(definition: AnyToolDefinition): AnyToolDefin
         isError: context.isError,
         theme,
         expanded: context.expanded,
-        pending: {
-          isSettled: () => Boolean(state.osseoResultPresent),
-          snapshot: () => ({
-            name,
-            args: args as Record<string, unknown>,
-            result: undefined,
-            isPartial: true,
-            isError: context.isError,
-            elapsedMs: bashElapsedMs(state, context.isPartial),
-            sourcePath: theme.sourcePath,
-          }) satisfies DetailInput,
-        },
+        // Only while the runtime reports the call as partial does the pending
+        // slot exist; the snapshot feeds the flat detail emitter. Once a result
+        // is present the slot stays absent and EdgeOutputComponent.detail
+        // carries the settled rows.
+        pending: context.isPartial
+          ? {
+              isSettled: () => Boolean(state.osseoResultPresent),
+              snapshot: () => ({
+                name,
+                args: args as Record<string, unknown>,
+                result: undefined,
+                isPartial: true,
+                isError: context.isError,
+                elapsedMs: bashElapsedMs(state, true),
+                sourcePath: theme.sourcePath,
+              }) satisfies DetailInput,
+            }
+          : undefined,
       })
     },
     renderResult(result, options, theme, context) {
