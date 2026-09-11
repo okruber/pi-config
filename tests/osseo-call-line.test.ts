@@ -214,29 +214,40 @@ test('expanded edge renderer prefixes every inner line with the gutter', () => {
   }
 })
 
-test('collapsed edge renderer shows the flat detail and drops passthrough', () => {
+test('collapsed edge renderer shows preview rows, an OUTPUT row, and drops passthrough', () => {
   const lines = new EdgeOutputComponent({
     inner: new StubComponent(['plain result']),
     expanded: false,
     theme,
     detail: settledDetail('read', { path: '/tmp/x.md' }, textResult(['a', 'b', 'c'])),
   }).render(80)
-  assert.equal(lines.length, 1)
-  assert.ok(lines[0]!.includes('3 lines') && lines[0]!.includes('L1–3'))
-  assert.ok(lines[0]!.includes('│'))
+  assert.equal(lines.length, 4)
+  assert.ok(lines[0]!.includes('│') && lines[0]!.includes('a'))
+  assert.ok(lines[1]!.includes('│') && lines[1]!.includes('b'))
+  assert.ok(lines[2]!.includes('… 1 more line (ctrl+o)'))
+  const output = lines[3]!
+  assert.ok(output.includes('OUTPUT · 3 lines · L1–3'))
+  assert.ok(output.includes(SAGE_FG))
+  assert.ok(!output.includes('│'))
   assert.ok(lines.every((line) => !/[╭╮╰╯▌]/.test(line)))
   assert.ok(!lines.includes('plain result'))
 })
 
-test('flatDetail prefixes the mauve edge and closes every line', () => {
-  const lines = flatDetail(['alpha', 'beta'], 60, undefined)
-  assert.equal(lines.length, 2)
-  for (const line of lines) {
+test('flatDetail prefixes rows, appends the unedged sage OUTPUT row, and closes every line', () => {
+  const lines = flatDetail({ rows: ['alpha', 'beta'], outputLabel: 'OUTPUT · 3 lines · L1–3' }, 60, undefined)
+  assert.equal(lines.length, 3)
+  for (const line of lines.slice(0, 2)) {
     assert.ok(line.includes(`${hexToFg(OSSEO_COLORS.mauveTaupe)}│ \x1b[39m`))
+  }
+  const output = lines[2]!
+  assert.ok(output.startsWith(`${SAGE_FG}OUTPUT · 3 lines · L1–3`))
+  assert.ok(!output.includes('│'))
+  for (const line of lines) {
     assert.ok(line.endsWith(ANSI_CLOSE))
     assert.ok(visibleWidth(line) <= 60)
   }
-  assert.deepEqual(flatDetail(['x'], 0, undefined), [])
+  assert.deepEqual(flatDetail({ rows: ['x'] }, 0, undefined), [])
+  assert.deepEqual(flatDetail({ rows: [] }, 60, undefined), [])
 })
 
 test('collapsed edge renderer without detail renders nothing', () => {
@@ -306,17 +317,24 @@ test('resolveThemeVar falls back to the palette for unknown vars and broken file
   assert.equal(resolveThemeVar(partial, 'mossGreen'), OSSEO_COLORS.mossGreen)
 })
 
-test('detail builders band the per-tool preview', () => {
+test('detail builders return preview rows and OUTPUT labels', () => {
   const read = buildToolDetail(settledDetail('read', { path: '/tmp/x.md' }, textResult(['a', 'b', 'c'])))
-  assert.deepEqual(read, [`${BAND_SUCCESS}3 lines · L1–3${ANSI_CLOSE}`])
+  assert.deepEqual(read, {
+    rows: ['a', 'b', `${SAGE_FG}… 1 more line (ctrl+o)\x1b[39m`],
+    outputLabel: 'OUTPUT · 3 lines · L1–3',
+  })
 
   const readRange = buildToolDetail(
     settledDetail('read', { path: '/tmp/x.md', offset: 10, limit: 5 }, textResult(['a', 'b', 'c'])),
   )
-  assert.deepEqual(readRange, [`${BAND_SUCCESS}3 lines · L10–14${ANSI_CLOSE}`])
+  assert.deepEqual(readRange, {
+    rows: ['a', 'b', `${SAGE_FG}… 1 more line (ctrl+o)\x1b[39m`],
+    outputLabel: 'OUTPUT · 3 lines · L10–14',
+  })
 
   const write = buildToolDetail(settledDetail('write', { path: 'notes.md', content: 'a\nb' }, textResult([])))
-  assert.deepEqual(write, [`${BAND_SUCCESS}3 B · 2 lines${ANSI_CLOSE}`])
+  assert.deepEqual(write, { rows: [], outputLabel: 'OUTPUT · 3 B · 2 lines' })
+
   const grep = buildToolDetail(
     settledDetail('grep', { pattern: 'x', path: 'src' }, textResult([
       'osseo-call-line.ts:118: renderResult',
@@ -324,42 +342,47 @@ test('detail builders band the per-tool preview', () => {
       'osseo-transcript.ts:44: renderResult',
     ])),
   )
-  assert.deepEqual(grep, [
-    `${BAND_SUCCESS}3 matches · first: osseo-call-line.ts:118${ANSI_CLOSE}`,
-    'osseo-call-line.ts:121 · osseo-transcript.ts:44',
-  ])
+  assert.deepEqual(grep, {
+    rows: [
+      'osseo-call-line.ts:118: renderResult',
+      'osseo-call-line.ts:121: renderCall',
+      `${SAGE_FG}… 1 more match (ctrl+o)\x1b[39m`,
+    ],
+    outputLabel: 'OUTPUT · 3 matches',
+  })
 
   const find = buildToolDetail(
     settledDetail('find', { pattern: 'osseo', path: 'ext' }, textResult(['osseo-style.ts', 'osseo-call-line.ts', 'osseo-transcript.ts'])),
   )
-  assert.deepEqual(find, [
-    `${BAND_SUCCESS}3 files · osseo-style.ts · osseo-call-line.ts · osseo-transcript.ts${ANSI_CLOSE}`,
-  ])
+  assert.deepEqual(find, {
+    rows: ['osseo-style.ts', 'osseo-call-line.ts', 'osseo-transcript.ts'],
+    outputLabel: 'OUTPUT · 3 files',
+  })
 
   const ls = buildToolDetail(
     settledDetail('ls', { path: '.' }, textResult(['a.ts', 'b.ts', 'dir1/', 'dir2/', 'e.md'])),
   )
-  assert.deepEqual(ls, [`${BAND_SUCCESS}5 entries · 2 dirs${ANSI_CLOSE}`])
+  assert.deepEqual(ls, {
+    rows: ['a.ts', 'b.ts', 'dir1/', `${SAGE_FG}… 2 more (ctrl+o)\x1b[39m`],
+    outputLabel: 'OUTPUT · 5 entries · 2 dirs',
+  })
 })
 
 test('bash settled detail shows the last three lines and a truncation hint', () => {
   const ten = Array.from({ length: 10 }, (_, i) => `line ${i + 1}`)
   const detail = buildToolDetail(settledDetail('bash', { command: 'npm test' }, textResult(ten)))
-  assert.equal(detail.length, 4)
-  assert.equal(detail[0], 'line 8')
-  assert.equal(detail[1], 'line 9')
-  assert.equal(detail[2], 'line 10')
-  assert.ok(detail[3]!.includes('… +7 more'))
-  assert.ok(detail[3]!.includes(SAGE_FG))
+  assert.deepEqual(detail, {
+    rows: ['line 8', 'line 9', 'line 10', `${SAGE_FG}… +7 more\x1b[39m`],
+  })
 
   const short = buildToolDetail(settledDetail('bash', { command: 'npm test' }, textResult(['only line'])))
-  assert.deepEqual(short, ['only line'])
+  assert.deepEqual(short, { rows: ['only line'] })
 
   const empty = buildToolDetail(settledDetail('bash', { command: 'true' }, textResult([])))
-  assert.deepEqual(empty, [`${BAND_SUCCESS}no output${ANSI_CLOSE}`])
+  assert.deepEqual(empty, { rows: [], outputLabel: 'OUTPUT · no output' })
 })
 
-test('edit settled detail caps changes and hints the rest', () => {
+test('edit settled detail caps banded changes, hints the rest, and labels the counts', () => {
   const changes: string[] = []
   for (let i = 1; i <= 5; i++) {
     changes.push(`- 10 old ${i}`, `+ 10 new ${i}`)
@@ -367,25 +390,28 @@ test('edit settled detail caps changes and hints the rest', () => {
   const detail = buildToolDetail(
     settledDetail('edit', { path: 'a.ts' }, textResult([], { diff: changes.join('\n') })),
   )
-  assert.equal(detail.length, 4)
-  assert.ok(detail[0]!.startsWith(`${BAND_ERROR}− old 1${ANSI_CLOSE}`))
-  assert.ok(detail[1]!.startsWith(`${BAND_SUCCESS}+ new 1${ANSI_CLOSE}`))
-  assert.ok(detail[3]!.includes('… +7 more changes'))
+  assert.equal(detail.rows.length, 4)
+  assert.ok(detail.rows[0]!.startsWith(`${BAND_ERROR}− old 1${ANSI_CLOSE}`))
+  assert.ok(detail.rows[1]!.startsWith(`${BAND_SUCCESS}+ new 1${ANSI_CLOSE}`))
+  assert.ok(detail.rows[3]!.includes('… +7 more changes'))
+  assert.equal(detail.outputLabel, 'OUTPUT · 5 additions and 5 removals')
 })
 
-test('grep and find details cap locations and hint remaining files', () => {
+test('grep and find details cap preview rows and label the totals', () => {
   const matches = Array.from({ length: 5 }, (_, i) => `f${i}.ts:${i + 1}: hit`)
   const grep = buildToolDetail(settledDetail('grep', { pattern: 'x' }, textResult(matches)))
-  assert.equal(grep.length, 2)
-  assert.ok(grep[0]!.includes('5 matches'))
-  assert.ok(grep[1]!.includes('… +2 file'))
+  assert.deepEqual(grep.rows, [
+    'f0.ts:1: hit',
+    'f1.ts:2: hit',
+    `${SAGE_FG}… 3 more matches (ctrl+o)\x1b[39m`,
+  ])
+  assert.equal(grep.outputLabel, 'OUTPUT · 5 matches')
 
   const files = Array.from({ length: 5 }, (_, i) => `f${i}.ts`)
   const find = buildToolDetail(settledDetail('find', { pattern: 'x' }, textResult(files)))
-  assert.equal(find.length, 1)
-  assert.ok(find[0]!.includes('5 files'))
-  assert.ok(find[0]!.includes('f0.ts · f1.ts · f2.ts'))
-  assert.ok(find[0]!.includes('… +2 more'))
+  assert.equal(find.rows.length, 4)
+  assert.ok(find.rows[3]!.includes('… 2 more (ctrl+o)'))
+  assert.equal(find.outputLabel, 'OUTPUT · 5 files')
 })
 
 test('pending detail derives from args for every tool', () => {
@@ -393,44 +419,47 @@ test('pending detail derives from args for every tool', () => {
     name: 'bash', args: { command: 'npm test' }, result: undefined,
     isPartial: true, isError: false, elapsedMs: 2100, sourcePath: undefined,
   })
-  assert.deepEqual(bash, [`${PENDING_FG}running · 2.1 s\x1b[39m`])
+  assert.deepEqual(bash, { rows: [`${PENDING_FG}running · 2.1 s\x1b[39m`] })
 
   const edit = buildToolDetail({
     name: 'edit', args: { path: 'a.ts', edits: [{ oldText: 'x', newText: 'y' }, { oldText: 'p', newText: 'q' }] },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(edit, [`${PENDING_FG}2 edits pending\x1b[39m`])
+  assert.deepEqual(edit, { rows: [`${PENDING_FG}2 edits pending\x1b[39m`] })
 
   const write = buildToolDetail({
     name: 'write', args: { path: 'n.md', content: 'hello' },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(write, [`${PENDING_FG}5 B · 1 line\x1b[39m`])
+  assert.deepEqual(write, { rows: [`${PENDING_FG}5 B · 1 line\x1b[39m`] })
 
   const read = buildToolDetail({
     name: 'read', args: { path: 'x.md', offset: 4, limit: 10 },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(read, [`${PENDING_FG}reading · L4–13\x1b[39m`])
+  assert.deepEqual(read, { rows: [`${PENDING_FG}reading · L4–13\x1b[39m`] })
 
   const grep = buildToolDetail({
     name: 'grep', args: { pattern: 'x', path: 'src' },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(grep, [`${PENDING_FG}searching · src\x1b[39m`])
+  assert.deepEqual(grep, { rows: [`${PENDING_FG}searching · src\x1b[39m`] })
 
   const ls = buildToolDetail({
     name: 'ls', args: { path: 'tests/' },
     result: undefined, isPartial: true, isError: false, elapsedMs: undefined, sourcePath: undefined,
   })
-  assert.deepEqual(ls, [`${PENDING_FG}listing · tests/\x1b[39m`])
+  assert.deepEqual(ls, { rows: [`${PENDING_FG}listing · tests/\x1b[39m`] })
 })
 
-test('error detail bands the failure body and keeps the status line sage', () => {
+test('error detail colors the failure body signal red and keeps the status line sage', () => {
   const editError = buildToolDetail(
     settledDetail('edit', { path: 'a.ts' }, textResult(['oldText match failed at line 118']), { isError: true }),
   )
-  assert.deepEqual(editError, [`${BAND_ERROR}oldText match failed at line 118${ANSI_CLOSE}`])
+  assert.deepEqual(editError, {
+    rows: [`${ERROR_STATE_FG}oldText match failed at line 118\x1b[39m`],
+  })
+  assert.ok(!editError.rows[0]!.includes(hexToBg(OSSEO_COLORS.toolErrorBg)))
 
   const bashError = buildToolDetail(
     settledDetail(
@@ -440,10 +469,12 @@ test('error detail bands the failure body and keeps the status line sage', () =>
       { isError: true },
     ),
   )
-  assert.deepEqual(bashError, [
-    `${BAND_ERROR}boom${ANSI_CLOSE}`,
-    `${SAGE_FG}Command exited with code 2\x1b[39m`,
-  ])
+  assert.deepEqual(bashError, {
+    rows: [
+      `${ERROR_STATE_FG}boom\x1b[39m`,
+      `${SAGE_FG}Command exited with code 2\x1b[39m`,
+    ],
+  })
 
   const longBashError = buildToolDetail(
     settledDetail(
@@ -453,13 +484,15 @@ test('error detail bands the failure body and keeps the status line sage', () =>
       { isError: true },
     ),
   )
-  assert.equal(longBashError.length, 4)
-  assert.ok(longBashError[0]!.includes('l3'))
-  assert.ok(longBashError[1]!.includes('l4'))
-  assert.ok(longBashError[2]!.includes('… +2 more'))
-  assert.ok(longBashError[3]!.includes(SAGE_FG))
-  assert.ok(longBashError[3]!.includes('Command exited with code 1'))
-  assert.ok(!longBashError[3]!.includes(hexToBg(OSSEO_COLORS.toolErrorBg)))
+  assert.equal(longBashError.rows.length, 4)
+  assert.ok(longBashError.rows[0]!.includes('l3'))
+  assert.ok(longBashError.rows[1]!.includes('l4'))
+  assert.ok(longBashError.rows[2]!.includes('… +2 more'))
+  assert.ok(longBashError.rows[3]!.includes(SAGE_FG))
+  assert.ok(longBashError.rows[3]!.includes('Command exited with code 1'))
+  for (const row of longBashError.rows) {
+    assert.ok(!row.includes(hexToBg(OSSEO_COLORS.toolErrorBg)))
+  }
 })
 
 test('bash pending detail live-tails the streamed output', () => {
@@ -471,7 +504,9 @@ test('bash pending detail live-tails the streamed output', () => {
       { isPartial: true, elapsedMs: 2100 },
     ),
   )
-  assert.deepEqual(detail, [`${PENDING_FG}running · 2.1 s\x1b[39m`, 't2', 't3', 't4'])
+  assert.deepEqual(detail, {
+    rows: [`${PENDING_FG}running · 2.1 s\x1b[39m`, 't2', 't3', 't4'],
+  })
 })
 
 test('ledger names render bold in deep navy via theme.bold', () => {

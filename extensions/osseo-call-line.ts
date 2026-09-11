@@ -39,10 +39,32 @@ function edgeLine(sourcePath: string | undefined): string {
   return `${hexToFg(resolveThemeVar(sourcePath, 'mauveTaupe'))}│ \x1b[39m`
 }
 
+function errorFg(sourcePath: string | undefined, text: string): string {
+  return `${hexToFg(resolveThemeVar(sourcePath, 'signalRed'))}${text}\x1b[39m`
+}
+
 // omp rule: 3 lines collapsed. Live-tail scans only the trailing bytes so
 // per-tick cost stays bounded by the cap regardless of total output size.
 const DETAIL_TAIL_LINES = 3
 const TAIL_SCAN_BYTES = 2048
+// collapsed previews: 1–3 edge-prefixed content lines plus a truncation hint
+const PREVIEW_TEXT_LINES = 2
+const PREVIEW_ENTRY_LINES = 3
+
+function previewRows(
+  lines: string[],
+  count: number,
+  unit: { one: string; many: string },
+  sourcePath: string | undefined,
+): string[] {
+  const rows = lines.slice(0, count).map((line) => stripTerminalSequences(line))
+  if (lines.length > count) {
+    const remaining = lines.length - count
+    const noun = remaining === 1 ? unit.one : unit.many
+    rows.push(hintLine(`… ${remaining} more${noun ? ` ${noun}` : ''} (ctrl+o)`, sourcePath))
+  }
+  return rows
+}
 
 export type ToolTheme = Pick<Theme, 'sourcePath' | 'fg' | 'bold'>
 
@@ -50,6 +72,8 @@ export type ToolResultContent = {
   content?: Array<{ type?: string; text?: unknown }>
   details?: Record<string, unknown>
 }
+
+export type ToolDetail = { rows: string[]; outputLabel?: string }
 
 export type DetailInput = {
   name: BuiltInToolName
@@ -169,120 +193,127 @@ function readDetail(
   args: Record<string, unknown>,
   output: string,
   sourcePath: string | undefined,
-): string[] {
-  const lineCount = splitBodyLines(output).length
+): ToolDetail {
+  const lines = splitBodyLines(output)
+  const lineCount = lines.length
   const start = typeof args.offset === 'number' ? args.offset : 1
   const end =
     typeof args.limit === 'number' ? start + args.limit - 1 : start + Math.max(lineCount, 1) - 1
-  return [band(sourcePath, 'success', `${lineCount} lines · L${start}–${end}`)]
-}
-
-function grepDetail(output: string, sourcePath: string | undefined): string[] {
-  const locations: string[] = []
-  for (const line of splitBodyLines(output)) {
-    const match = /^([^:\n]+):(\d+):/.exec(line)
-    if (match) locations.push(`${match[1]}:${match[2]}`)
+  return {
+    rows: previewRows(lines, PREVIEW_TEXT_LINES, { one: 'line', many: 'lines' }, sourcePath),
+    outputLabel: `OUTPUT · ${lineCount} lines · L${start}–${end}`,
   }
-  if (locations.length === 0) return [band(sourcePath, 'success', 'no matches')]
-  const shown = locations.slice(0, 3)
-  const first = band(sourcePath, 'success', `${locations.length} matches · first: ${shown[0]}`)
-  if (shown.length === 1) return [first]
-  let rest = shown.slice(1).join(' · ')
-  if (locations.length > 3) rest += ` ${hintLine(`… +${locations.length - 3} file`, sourcePath)}`
-  return [first, rest]
 }
 
-function findDetail(output: string, sourcePath: string | undefined): string[] {
+function grepDetail(output: string, sourcePath: string | undefined): ToolDetail {
+  const lines = splitBodyLines(output)
+  if (lines.length === 0) return { rows: [], outputLabel: 'OUTPUT · no matches' }
+  return {
+    rows: previewRows(lines, PREVIEW_TEXT_LINES, { one: 'match', many: 'matches' }, sourcePath),
+    outputLabel: `OUTPUT · ${lines.length} matches`,
+  }
+}
+
+function findDetail(output: string, sourcePath: string | undefined): ToolDetail {
   const files = splitBodyLines(output)
-  const shown = files.slice(0, 3)
-  let text = `${files.length} files`
-  if (shown.length > 0) text += ` · ${shown.join(' · ')}`
-  let line = band(sourcePath, 'success', text)
-  if (files.length > 3) line += ` ${hintLine(`… +${files.length - 3} more`, sourcePath)}`
-  return [line]
+  return {
+    rows: previewRows(files, PREVIEW_ENTRY_LINES, { one: '', many: '' }, sourcePath),
+    outputLabel: `OUTPUT · ${files.length} files`,
+  }
 }
 
-function lsDetail(output: string, sourcePath: string | undefined): string[] {
+function lsDetail(output: string, sourcePath: string | undefined): ToolDetail {
   const entries = splitBodyLines(output)
   const dirs = entries.filter((entry) => entry.endsWith('/')).length
-  return [band(sourcePath, 'success', `${entries.length} entries · ${dirs} dirs`)]
+  return {
+    rows: previewRows(entries, PREVIEW_ENTRY_LINES, { one: '', many: '' }, sourcePath),
+    outputLabel: `OUTPUT · ${entries.length} entries · ${dirs} dirs`,
+  }
 }
 
-function bashDetail(input: DetailInput, output: string): string[] {
+function bashDetail(input: DetailInput, output: string): ToolDetail {
   if (input.isPartial) {
     const elapsed = input.elapsedMs !== undefined ? ` · ${(input.elapsedMs / 1000).toFixed(1)} s` : ''
     const { lines } = countTail(output, DETAIL_TAIL_LINES)
-    return [pendingFg(input.sourcePath, `running${elapsed}`), ...lines]
+    return { rows: [pendingFg(input.sourcePath, `running${elapsed}`), ...lines] }
   }
   const { lines, total } = countTail(output, DETAIL_TAIL_LINES)
-  if (lines.length === 0) return [band(input.sourcePath, 'success', 'no output')]
-  const detail = [...lines]
+  if (lines.length === 0) return { rows: [], outputLabel: 'OUTPUT · no output' }
+  const rows = [...lines]
   if (total > lines.length) {
-    detail.push(hintLine(`… +${total - lines.length} more`, input.sourcePath))
+    rows.push(hintLine(`… +${total - lines.length} more`, input.sourcePath))
   }
-  return detail
+  return { rows }
 }
 
-function editDetail(input: DetailInput, output: string): string[] {
+function countUnit(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? '' : 's'}`
+}
+
+function editDetail(input: DetailInput, output: string): ToolDetail {
   const diff = resultDiff(input.result)
   if (diff === undefined) {
-    const lines = splitBodyLines(output).slice(0, 3)
-    return lines.length > 0 ? lines : []
+    return { rows: splitBodyLines(output).slice(0, 3) }
   }
   const changes: Array<{ sign: '-' | '+'; text: string }> = []
   for (const line of diff.split('\n')) {
     const match = /^([+-]) *\d+ (.*)$/.exec(line)
     if (match) changes.push({ sign: match[1] as '-' | '+', text: match[2] ?? '' })
   }
-  if (changes.length === 0) return []
+  if (changes.length === 0) return { rows: [] }
   const rows = changes.slice(0, 3).map((change) => {
     const prefix = change.sign === '-' ? '−' : '+'
     return band(input.sourcePath, change.sign === '-' ? 'error' : 'success', `${prefix} ${change.text}`)
   })
   if (changes.length > 3) rows.push(hintLine(`… +${changes.length - 3} more changes`, input.sourcePath))
-  return rows
+  const additions = changes.filter((change) => change.sign === '+').length
+  const removals = changes.length - additions
+  return {
+    rows,
+    outputLabel: `OUTPUT · ${countUnit(additions, 'addition')} and ${countUnit(removals, 'removal')}`,
+  }
 }
 
-function errorDetail(output: string, sourcePath: string | undefined): string[] {
+function errorDetail(output: string, sourcePath: string | undefined): ToolDetail {
   const all = splitBodyLines(output)
-  if (all.length === 0) return [band(sourcePath, 'error', 'failed')]
+  if (all.length === 0) return { rows: [errorFg(sourcePath, 'failed')] }
   const hasStatus = /^Command (exited with code \d+|aborted|timed out after \d+ seconds)$/.test(
     all[all.length - 1]!,
   )
   const body = hasStatus ? all.slice(0, -1) : all
   const statusLine = hasStatus ? all[all.length - 1] : undefined
   const bodyTail = body.slice(-2)
-  const rows = bodyTail.map((line) => band(sourcePath, 'error', line))
+  const rows = bodyTail.map((line) => errorFg(sourcePath, line))
   if (body.length > bodyTail.length) {
     rows.push(hintLine(`… +${body.length - bodyTail.length} more`, sourcePath))
   }
   if (statusLine !== undefined) rows.push(hintLine(statusLine, sourcePath))
-  return rows.length > 0 ? rows : [band(sourcePath, 'error', 'failed')]
+  return { rows: rows.length > 0 ? rows : [errorFg(sourcePath, 'failed')] }
 }
 
-function pendingDetail(input: DetailInput): string[] {
+function pendingDetail(input: DetailInput): ToolDetail {
   const { name, args, elapsedMs, sourcePath } = input
   if (name === 'bash') {
     const elapsed = elapsedMs !== undefined ? ` · ${(elapsedMs / 1000).toFixed(1)} s` : ''
-    return [pendingFg(sourcePath, `running${elapsed}`)]
+    return { rows: [pendingFg(sourcePath, `running${elapsed}`)] }
   }
   if (name === 'edit') {
     const edits = Array.isArray(args.edits) ? args.edits.length : 1
-    return [pendingFg(sourcePath, `${edits} edit${edits === 1 ? '' : 's'} pending`)]
+    return { rows: [pendingFg(sourcePath, `${edits} edit${edits === 1 ? '' : 's'} pending`)] }
   }
-  if (name === 'write') return [pendingFg(sourcePath, writeSizeText(args))]
+  if (name === 'write') return { rows: [pendingFg(sourcePath, writeSizeText(args))] }
   if (name === 'read') {
     const start = typeof args.offset === 'number' ? args.offset : 1
     const end = typeof args.limit === 'number' ? start + args.limit - 1 : '…'
-    return [pendingFg(sourcePath, `reading · L${start}–${end}`)]
+    return { rows: [pendingFg(sourcePath, `reading · L${start}–${end}`)] }
   }
   if (name === 'grep' || name === 'find') {
-    return [pendingFg(sourcePath, `searching · ${stringArg(args, 'path', '.')}`)]
+    return { rows: [pendingFg(sourcePath, `searching · ${stringArg(args, 'path', '.')}`)] }
   }
-  return [pendingFg(sourcePath, `listing · ${stringArg(args, 'path', '.')}`)]
+  return { rows: [pendingFg(sourcePath, `listing · ${stringArg(args, 'path', '.')}`)] }
 }
 
-export function buildToolDetail(input: DetailInput): string[] {
+export function buildToolDetail(input: DetailInput): ToolDetail {
   const output = resultText(input.result)
   if (input.isError) return errorDetail(output, input.sourcePath)
   if (!input.result) return pendingDetail(input)
@@ -294,7 +325,7 @@ export function buildToolDetail(input: DetailInput): string[] {
     case 'read':
       return readDetail(input.args, output, input.sourcePath)
     case 'write':
-      return [band(input.sourcePath, 'success', writeSizeText(input.args))]
+      return { rows: [], outputLabel: `OUTPUT · ${writeSizeText(input.args)}` }
     case 'grep':
       return grepDetail(output, input.sourcePath)
     case 'find':
@@ -304,12 +335,15 @@ export function buildToolDetail(input: DetailInput): string[] {
   }
 }
 
-export function flatDetail(detail: string[], width: number, sourcePath: string | undefined): string[] {
+export function flatDetail(detail: ToolDetail, width: number, sourcePath: string | undefined): string[] {
   if (width <= 0) return []
-  const inner = Math.max(1, width - 2)
-  return detail.map((line) =>
+  const lines = detail.rows.map((line) =>
     fitAnsi(`${edgeLine(sourcePath)}${line}`, width),
   )
+  if (detail.outputLabel !== undefined) {
+    lines.push(fitAnsi(hintLine(detail.outputLabel, sourcePath), width))
+  }
+  return lines
 }
 
 function argsKey(name: BuiltInToolName, args: Record<string, unknown>): string {
