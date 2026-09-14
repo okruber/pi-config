@@ -17,7 +17,7 @@ export const OSSEO_COLORS = {
   signalGreen: '#0B8C50',
   signalBlue: '#2072B2',
   toolPendingBg: '#f3efec',
-  toolSuccessBg: '#c5d5c8',
+  toolSuccessBg: '#efebe6',
   toolErrorBg: '#e2cac8',
   frameLine: '#d3ccc4',
   framePendingLine: '#e0c3b0',
