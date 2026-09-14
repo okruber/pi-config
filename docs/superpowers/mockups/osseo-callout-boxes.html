@@ -97,8 +97,8 @@ const PRESETS = {
   'paper lift':       { pendingFill:'#f8f2ec', pendingLine:'#dcc0ae', successFill:'#f5f2ee', successLine:'#c9bfb6', errorFill:'#f7e9e5', errorLine:'#d9b3aa' },
 };
 
-let scheme = { ...PRESETS['signal tint'] };
-let activePreset = 'signal tint';
+let scheme = { ...PRESETS['paper lift'] };
+let activePreset = 'paper lift';
 
 const mono = {
   title: (t) => `<b style="color:${PAL.deepNavy}">${t}</b>`,
@@ -125,16 +125,18 @@ function row(state, inner) {
   return `<span class="row" style="background:${scheme[state + 'Fill']}">${inner}</span>\n`;
 }
 
+function visible(text) { return text.replace(/<[^>]*>/g, ''); }
+
 function bar(state, left, right, label, width) {
   const l = `${left}${'─'.repeat(3)}`;
   if (!label) return frameLine(state, `${l}${'─'.repeat(width - 5)}${right}`);
-  const fill = '─'.repeat(Math.max(0, width - 5 - label.length - 2));
+  const fill = '─'.repeat(Math.max(0, width - visible(label).length - 7));
   return `${frameLine(state, l)} ${label} ${frameLine(state, fill + right)}`;
 }
 
 function content(state, text, width) {
-  const inner = ` ${text}`.padEnd(width - 3, ' ');
-  return `${frameLine(state, '│')}${inner}${frameLine(state, '│')}`;
+  const pad = ' '.repeat(Math.max(0, width - 4 - visible(text).length));
+  return `${frameLine(state, '│')} ${text}${pad} ${frameLine(state, '│')}`;
 }
 
 function frame(state, { header, sections }, width = 74) {
