@@ -25,4 +25,8 @@ mkdir -p node_modules/@earendil-works
 ln -s "$pi_root" node_modules/@earendil-works/pi-coding-agent
 ln -s "$pi_root/node_modules/@earendil-works/pi-tui" node_modules/@earendil-works/pi-tui
 
-node --test tests/osseo-call-line.test.ts
+if [ "$#" -gt 0 ]; then
+  node --test "$@"
+else
+  node --test tests/*.test.ts
+fi
