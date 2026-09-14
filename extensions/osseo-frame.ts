@@ -19,7 +19,7 @@ const FRAME_LINE_VAR: Record<FrameState, OsseoColorName> = {
   error: 'frameErrorLine',
 }
 
-const FRAME_FILL_VAR: Record<FrameState, OsseoColorName> = {
+const FRAME_FILL_SLOT: Record<FrameState, 'toolPendingBg' | 'toolSuccessBg' | 'toolErrorBg'> = {
   pending: 'toolPendingBg',
   success: 'toolSuccessBg',
   error: 'toolErrorBg',
@@ -37,7 +37,7 @@ export const STATE_SYMBOL: Record<FrameState, '◌' | '✓' | '✗'> = {
   error: '✗',
 }
 
-export type ThemeSlice = Pick<Theme, 'sourcePath' | 'fg' | 'bold'>
+export type ThemeSlice = Pick<Theme, 'sourcePath' | 'fg' | 'bold' | 'getBgAnsi'>
 
 export type FrameColors = {
   line: (text: string) => string
@@ -55,7 +55,7 @@ export type FrameColors = {
 
 export function resolveFrameColors(theme: ThemeSlice, state: FrameState): FrameColors {
   const sourcePath = theme.sourcePath
-  const fillAnsi = hexToBg(resolveThemeVar(sourcePath, FRAME_FILL_VAR[state]))
+  const fillAnsi = theme.getBgAnsi(FRAME_FILL_SLOT[state])
   return {
     line: (text) => `${hexToFg(resolveThemeVar(sourcePath, FRAME_LINE_VAR[state]))}${text}\x1b[39m`,
     fill: (text) => {

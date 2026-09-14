@@ -1,5 +1,13 @@
 import { initTheme } from '@earendil-works/pi-coding-agent'
-import { stripTerminalSequences, type Component } from '@earendil-works/pi-tui'
+import {
+  KeybindingsManager,
+  TUI_KEYBINDINGS,
+  getKeybindings,
+  setKeybindings,
+  stripTerminalSequences,
+  type Component,
+} from '@earendil-works/pi-tui'
+import { OSSEO_COLORS, hexToBg } from '../extensions/osseo-style.ts'
 
 // keyHint, renderDiff, and highlightCode read pi's global theme proxy, which
 // throws until initTheme has run once in this process.
@@ -15,12 +23,25 @@ function ensureGlobalTheme(): void {
 }
 ensureGlobalTheme()
 
+// Pi registers app-level keybindings like app.tools.expand at TUI startup; a
+// bare test process only has the pi-tui defaults, so seed the same binding or
+// expand hints render without a key.
+if (getKeybindings().getKeys('app.tools.expand' as never).length === 0) {
+  setKeybindings(
+    new KeybindingsManager({
+      ...TUI_KEYBINDINGS,
+      'app.tools.expand': { defaultKeys: 'ctrl+o', description: 'Toggle tool output' },
+    } as never),
+  )
+}
+
 export function fakeTheme(sourcePath?: string): any {
   return {
     sourcePath,
     fg: (_color: string, text: string) => text,
     bg: (_color: string, text: string) => text,
     bold: (text: string) => text,
+    getBgAnsi: (color: string) => hexToBg((OSSEO_COLORS as Record<string, string>)[color] ?? '#000000'),
   }
 }
 

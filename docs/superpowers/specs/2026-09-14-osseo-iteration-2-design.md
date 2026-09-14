@@ -64,9 +64,9 @@ vars, all already present in `themes/osseo-bone.json`:
 | success | `frameLine` | `toolSuccessBg` | `signalGreen` `✓` |
 | error | `frameErrorLine` | `toolErrorBg` | `signalRed` `✗` |
 
-Fills come from the `tool*Bg` vars so custom and MCP tools rendered by pi's
-own shell share the same background. `framePendingFill` and `frameErrorFill`
-stay reserved and unused. Text slots come from pi's theme: title `toolTitle`
+Fills come from the theme instance's `tool*Bg` slots via `getBgAnsi`, so
+frames always share pi's own shell background for custom and MCP tools.
+`framePendingFill` and `frameErrorFill` stay reserved and unused. Text slots come from pi's theme: title `toolTitle`
 bold, subject `muted`, meta `dim`, body `toolOutput`, diff `toolDiffAdded` /
 `toolDiffRemoved`. Status symbols stay `◌`, `✓`, `✗` per the iteration 1
 contract; omp's per-tool identity glyphs are not adopted.
@@ -126,10 +126,11 @@ re-render it as a styled line instead of letting it leak into body rows.
 
 ## Palette
 
-No new colors. The frame consumes the staged `frameLine`, `framePendingLine`,
-`frameErrorLine`, `toolPendingBg`, `toolSuccessBg`, `toolErrorBg`, and the
-signal hues, resolved through `resolveThemeVar` with `OSSEO_COLORS` fallbacks,
-exactly as iteration 1.
+No new colors. Border and symbol hues (`frameLine`, `framePendingLine`,
+`frameErrorLine`, signals) resolve through `resolveThemeVar` with
+`OSSEO_COLORS` fallbacks, exactly as iteration 1. Fills resolve through the
+theme instance's `toolPendingBg`, `toolSuccessBg`, `toolErrorBg` slots, the
+same source pi's default shell uses.
 
 ## Testing
 
