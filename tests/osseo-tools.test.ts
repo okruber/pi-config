@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import { createOsseoRenderers, editDiffStats, readCodeLines } from '../extensions/osseo-tools.ts'
 import { resolveFrameColors } from '../extensions/osseo-frame.ts'
 import { fakeContext, fakeTheme, renderStripped, textResult } from './osseo-test-utils.ts'
@@ -95,8 +96,8 @@ test('read result frames a code cell with a line-number gutter', () => {
 test('read gutter starts at the requested offset', () => {
   const colors = resolveFrameColors(fakeTheme(), 'success')
   const lines = readCodeLines('alpha\nbeta', 'typescript', 41, false, colors)
-  assert.ok(lines[0].startsWith('41 '))
-  assert.ok(lines[1].startsWith('42 '))
+  assert.ok(stripTerminalSequences(lines[0]).startsWith('41 '))
+  assert.ok(stripTerminalSequences(lines[1]).startsWith('42 '))
 })
 
 test('read error result renders the error frame', () => {

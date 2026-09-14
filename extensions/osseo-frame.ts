@@ -65,9 +65,9 @@ export function resolveFrameColors(theme: ThemeSlice, state: FrameState): FrameC
       return `${fillAnsi}${stabilized}\x1b[49m`
     },
     symbol: (text) => `${hexToFg(resolveThemeVar(sourcePath, STATE_SYMBOL_VAR[state]))}${text}\x1b[39m`,
-    title: (text) => theme.fg('toolTitle', theme.bold(text)),
-    subject: (text) => theme.fg('muted', text),
-    meta: (text) => theme.fg('dim', text),
+    title: (text) => `${hexToFg(resolveThemeVar(sourcePath, 'signalBlue'))}${theme.bold(text)}\x1b[39m`,
+    subject: (text) => `${hexToFg(resolveThemeVar(sourcePath, 'dustyBlue'))}${text}\x1b[39m`,
+    meta: (text) => `${hexToFg(resolveThemeVar(sourcePath, 'sageGrey'))}${text}\x1b[39m`,
     body: (text) => theme.fg('toolOutput', text),
     errorText: (text) => theme.fg('error', text),
     added: (text) => theme.fg('toolDiffAdded', text),

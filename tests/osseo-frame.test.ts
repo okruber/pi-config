@@ -108,7 +108,7 @@ test('countUnit pluralizes', () => {
 
 test('moreLine carries the expand hint', () => {
   const colors = resolveFrameColors(fakeTheme(), 'success')
-  const line = moreLine(5, 'line', colors)
+  const line = stripTerminalSequences(moreLine(5, 'line', colors))
   assert.ok(line.startsWith('… 5 more lines ('))
   assert.ok(line.includes('to expand'))
 })
@@ -116,12 +116,12 @@ test('moreLine carries the expand hint', () => {
 test('treeList caps collapsed items and marks the last branch', () => {
   const colors = resolveFrameColors(fakeTheme(), 'success')
   const items = Array.from({ length: 10 }, (_, i) => `f${i}`)
-  const collapsed = treeList(items, { expanded: false, maxCollapsed: 8, unit: 'file' }, colors)
+  const collapsed = treeList(items, { expanded: false, maxCollapsed: 8, unit: 'file' }, colors).map(stripTerminalSequences)
   assert.equal(collapsed.length, 9)
   assert.ok(collapsed[0].startsWith('├─ f0'))
   assert.ok(collapsed[7].startsWith('├─ f7'))
   assert.ok(collapsed[8].startsWith('… 2 more files ('))
-  const expanded = treeList(items, { expanded: true, maxCollapsed: 8, unit: 'file' }, colors)
+  const expanded = treeList(items, { expanded: true, maxCollapsed: 8, unit: 'file' }, colors).map(stripTerminalSequences)
   assert.equal(expanded.length, 10)
   assert.ok(expanded[9].startsWith('└─ f9'))
 })
@@ -131,7 +131,7 @@ test('tailWindow keeps the tail and counts skipped visual lines', () => {
   const text = Array.from({ length: 30 }, (_, i) => `line${i}`).join('\n')
   const lines = tailWindow(text, 10, 80, colors)
   assert.equal(lines.length, 11)
-  assert.ok(lines[0].startsWith('… (20 earlier lines, '))
+  assert.ok(stripTerminalSequences(lines[0]).startsWith('… (20 earlier lines, '))
   assert.equal(lines[10].trimEnd(), 'line29')
   const short = tailWindow('a\nb', 10, 80, colors)
   assert.deepEqual(short.map((line) => line.trimEnd()), ['a', 'b'])
