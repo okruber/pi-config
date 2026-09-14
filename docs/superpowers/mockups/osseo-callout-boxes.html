@@ -73,6 +73,7 @@ const PAL = {
   deepNavy: '#04162a', oxblood: '#6a3026', mossGreen: '#3e4739',
   sageGrey: '#89897c', dustyBlue: '#8894a0', terracotta: '#a56148',
   signalRed: '#B7333D', signalOrange: '#B85E14', signalGreen: '#0B8C50',
+  signalBlue: '#2072B2',
   muted: '#5f6570', dim: '#73747a', toolOutput: '#4f5964',
 };
 
@@ -96,9 +97,9 @@ let scheme = { ...PRESETS['borders + tint'] };
 let activePreset = 'borders + tint';
 
 const mono = {
-  title: (t) => `<b style="color:${PAL.deepNavy}">${t}</b>`,
-  subject: (t) => `<span style="color:${PAL.muted}">${t}</span>`,
-  meta: (t) => `<span style="color:${PAL.dim}">${t}</span>`,
+  title: (t) => `<b style="color:${PAL.signalBlue}">${t}</b>`,
+  subject: (t) => `<span style="color:${PAL.dustyBlue}">${t}</span>`,
+  meta: (t) => `<span style="color:${PAL.sageGrey}">${t}</span>`,
   body: (t) => `<span style="color:${PAL.toolOutput}">${t}</span>`,
   gutter: (t) => `<span style="color:${PAL.dim}">${t}</span>`,
   added: (t) => `<span style="color:${PAL.mossGreen}">${t}</span>`,
