@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createOsseoRenderers } from '../extensions/osseo-tools.ts'
+import { createOsseoRenderers, readCodeLines } from '../extensions/osseo-tools.ts'
+import { resolveFrameColors } from '../extensions/osseo-frame.ts'
 import { fakeContext, fakeTheme, renderStripped, textResult } from './osseo-test-utils.ts'
 
 function bashCall(contextOverrides: Record<string, unknown> = {}, args: Record<string, unknown> = { command: 'npm test' }) {
@@ -68,4 +69,54 @@ test('bash error result keeps output and renders the error frame', () => {
   )
   const lines = renderStripped(result, 50)
   assert.ok(lines.some((line) => line.includes('boom')))
+})
+
+test('read pending is a flat status line', () => {
+  const context = fakeContext({ args: { path: 'src/a.ts', offset: 10, limit: 20 } })
+  const renderers = createOsseoRenderers('read')
+  const component = renderers.renderCall!({ path: 'src/a.ts', offset: 10, limit: 20 }, fakeTheme(), context)
+  const lines = renderStripped(component, 60)
+  assert.deepEqual(lines, ['◌ Read: src/a.ts:10-29'])
+})
+
+test('read result frames a code cell with a line-number gutter', () => {
+  const body = Array.from({ length: 20 }, (_, i) => `const v${i} = ${i}`)
+  const context = fakeContext({ args: { path: 'src/a.ts' } })
+  const renderers = createOsseoRenderers('read')
+  const result = renderers.renderResult!(textResult(body), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.ok(lines[0].startsWith('╭─── ✓ Read: src/a.ts '))
+  assert.ok(lines.some((line) => line.includes(' 1 const v0 = 0')))
+  assert.ok(lines.some((line) => line.includes('12 const v11 = 11')))
+  assert.ok(lines.some((line) => line.includes('… 8 more lines (')))
+  assert.ok(!lines.some((line) => line.includes('const v12')))
+})
+
+test('read gutter starts at the requested offset', () => {
+  const colors = resolveFrameColors(fakeTheme(), 'success')
+  const lines = readCodeLines('alpha\nbeta', 'typescript', 41, false, colors)
+  assert.ok(lines[0].startsWith('41 '))
+  assert.ok(lines[1].startsWith('42 '))
+})
+
+test('read error result renders the error frame', () => {
+  const context = fakeContext({ args: { path: 'nope.ts' }, isError: true })
+  const renderers = createOsseoRenderers('read')
+  const result = renderers.renderResult!(textResult(['Error: ENOENT']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 50)
+  assert.ok(lines[0].startsWith('╭─── ✗ Read: nope.ts '))
+  assert.ok(lines.some((line) => line.includes('Error: ENOENT')))
+})
+
+test('read image result renders a placeholder body', () => {
+  const context = fakeContext({ args: { path: 'pic.png' } })
+  const renderers = createOsseoRenderers('read')
+  const result = renderers.renderResult!(
+    { content: [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }] },
+    { expanded: false, isPartial: false },
+    fakeTheme(),
+    context,
+  )
+  const lines = renderStripped(result, 50)
+  assert.ok(lines.some((line) => line.includes('(image)')))
 })

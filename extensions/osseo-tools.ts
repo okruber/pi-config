@@ -211,10 +211,96 @@ function bashRenderers(): ToolRendererPair {
   }
 }
 
+function readSubjectParts(args: Record<string, unknown>): { path: string; suffix: string; startLine: number } {
+  const path = pathArg(args)
+  const offset = typeof args.offset === 'number' ? args.offset : undefined
+  const limit = typeof args.limit === 'number' ? args.limit : undefined
+  const startLine = offset ?? 1
+  const suffix =
+    offset !== undefined || limit !== undefined
+      ? `:${startLine}${limit !== undefined ? `-${startLine + limit - 1}` : ''}`
+      : ''
+  return { path: path || '…', suffix, startLine }
+}
+
+export function readCodeLines(
+  text: string,
+  language: string | undefined,
+  startLine: number,
+  expanded: boolean,
+  colors: FrameColors,
+): string[] {
+  const raw = text.split('\n')
+  while (raw.length > 0 && raw[raw.length - 1] === '') raw.pop()
+  if (raw.length === 0) return [colors.meta('(empty file)')]
+  const shown = expanded ? raw : raw.slice(0, CODE_PREVIEW_LINES)
+  const highlighted = highlightCode(shown.join('\n'), language)
+  const gutterWidth = Math.max(2, String(startLine + shown.length - 1).length)
+  const lines = highlighted.map((line, index) => {
+    const gutter = String(startLine + index).padStart(gutterWidth, ' ')
+    return `${colors.meta(`${gutter} `)}${line}`
+  })
+  if (!expanded && raw.length > shown.length) {
+    lines.push(`${colors.meta(`… ${raw.length - shown.length} more lines `)}${expandHint(colors)}`)
+  }
+  return lines
+}
+
+function readRenderers(): ToolRendererPair {
+  const header = (state: FrameState, args: Record<string, unknown>, cwd: string, colors: FrameColors): string => {
+    const { path, suffix } = readSubjectParts(args)
+    return `${colors.symbol(STATE_SYMBOL[state])} ${colors.title('Read')}: ${linkedPath(path, cwd, colors)}${colors.subject(suffix)}`
+  }
+  return {
+    renderCall(args, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      return new MemoComponent(
+        (width) => {
+          if (state.resultPresent) return []
+          const colors = resolveFrameColors(theme, 'pending')
+          return [truncateToWidth(header('pending', ctx.args, ctx.cwd, colors), width, '')]
+        },
+        () => [state.resultPresent === true, argsKey(args)].join('|'),
+      )
+    },
+    renderResult(result, options, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      state.resultPresent = true
+      return new MemoComponent(
+        (width) => {
+          const frameState: FrameState = ctx.isError ? 'error' : 'success'
+          const colors = resolveFrameColors(theme, frameState)
+          const head = header(frameState, ctx.args, ctx.cwd, colors)
+          if (ctx.isError) {
+            return renderFrame({ header: head, state: 'error', sections: [{ lines: errorLines(result, colors) }], width }, colors)
+          }
+          const content = (result as { content?: Array<{ type?: string }> }).content ?? []
+          if (content.some((block) => block?.type === 'image')) {
+            return renderFrame({ header: head, state: frameState, sections: [{ lines: [colors.meta('(image)')] }], width }, colors)
+          }
+          const { body, notice } = stripNoticeFooter(resultText(result))
+          const { startLine } = readSubjectParts(ctx.args)
+          const sections: FrameSection[] = [
+            { lines: readCodeLines(body, getLanguageFromPath(pathArg(ctx.args)), startLine, options.expanded, colors) },
+          ]
+          const warning = truncationWarning((result as { details?: Record<string, unknown> }).details, notice)
+          if (warning) sections.push({ label: colors.title('Output'), lines: [colors.warning(warning)] })
+          return renderFrame({ header: head, state: frameState, sections, width }, colors)
+        },
+        () => [ctx.isError, options.expanded, resultText(result).length].join('|'),
+      )
+    },
+  }
+}
+
 export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
   switch (name) {
     case 'bash':
       return bashRenderers()
+    case 'read':
+      return readRenderers()
     default:
       throw new Error(`osseo renderer not implemented yet: ${name}`)
   }
