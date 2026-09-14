@@ -123,3 +123,109 @@ export function renderFrame(options: FrameOptions, colors: FrameColors): string[
   rows.push(bar(BOX.bl, BOX.br, undefined, width, colors))
   return rows.map((row) => colors.fill(truncateToWidth(row, width, '', true)))
 }
+
+export function statusHeader(
+  options: { state: FrameState; title: string; subject?: string; meta?: readonly string[] },
+  colors: FrameColors,
+): string {
+  let line = `${colors.symbol(STATE_SYMBOL[options.state])} ${colors.title(options.title)}`
+  if (options.subject) line += `: ${colors.subject(options.subject)}`
+  const meta = (options.meta ?? []).filter((item) => item.length > 0)
+  if (meta.length > 0) line += colors.meta(` · ${meta.join(' · ')}`)
+  return line
+}
+
+export function normalizeInline(value: string, fallback = '…'): string {
+  const normalized = stripTerminalSequences(value)
+    .replace(/\r\n|\r|\n/g, ' ↵ ')
+    .replace(/\t/g, ' ')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/ +/g, ' ')
+    .trim()
+  return normalized || fallback
+}
+
+export function expandHint(colors: FrameColors): string {
+  return `${colors.meta('(')}${keyHint('app.tools.expand', 'to expand')}${colors.meta(')')}`
+}
+
+function plural(unit: string, count: number): string {
+  if (count === 1) return unit
+  if (/[^aeiou]y$/.test(unit)) return `${unit.slice(0, -1)}ies`
+  if (/(?:ch|sh|s|x|z)$/.test(unit)) return `${unit}es`
+  return `${unit}s`
+}
+
+export function countUnit(count: number, unit: string): string {
+  return `${count} ${plural(unit, count)}`
+}
+
+export function moreLine(count: number, unit: string, colors: FrameColors): string {
+  return `${colors.meta(`… ${count} more ${plural(unit, count)} `)}${expandHint(colors)}`
+}
+
+export function treeList(
+  items: readonly string[],
+  options: { expanded: boolean; maxCollapsed: number; unit: string },
+  colors: FrameColors,
+): string[] {
+  const shown = options.expanded ? items : items.slice(0, options.maxCollapsed)
+  const truncated = !options.expanded && items.length > shown.length
+  const rows = shown.map((item, index) => {
+    const last = index === shown.length - 1 && !truncated
+    return `${colors.meta(last ? '└─' : '├─')} ${item}`
+  })
+  if (truncated) rows.push(moreLine(items.length - shown.length, options.unit, colors))
+  return rows
+}
+
+export function tailWindow(styledText: string, maxLines: number, width: number, colors: FrameColors): string[] {
+  const result = truncateToVisualLines(styledText, maxLines, width)
+  if (result.skippedCount <= 0) return result.visualLines
+  return [
+    `${colors.meta(`… (${result.skippedCount} earlier lines, `)}${keyHint('app.tools.expand', 'to expand')}${colors.meta(')')}`,
+    ...result.visualLines,
+  ]
+}
+
+export function stripNoticeFooter(text: string): { body: string; notice?: string } {
+  const trimmed = text.trimEnd()
+  if (!trimmed.endsWith(']')) return { body: trimmed, notice: undefined }
+  const start = trimmed.lastIndexOf('\n\n[')
+  if (start === -1) return { body: trimmed, notice: undefined }
+  return { body: trimmed.slice(0, start), notice: trimmed.slice(start + 2) }
+}
+
+export function resultText(result: { content?: Array<{ type?: string; text?: unknown }> } | undefined): string {
+  if (!result?.content) return ''
+  const parts: string[] = []
+  for (const block of result.content) {
+    if (block?.type === 'text' && typeof block.text === 'string') parts.push(block.text)
+  }
+  return parts.join('\n')
+}
+
+export class MemoComponent implements Component {
+  #key: string | undefined
+  #lines: string[] | undefined
+  readonly #frame: (width: number) => string[]
+  readonly #deps: () => string
+
+  constructor(frame: (width: number) => string[], deps: () => string) {
+    this.#frame = frame
+    this.#deps = deps
+  }
+
+  render(width: number): string[] {
+    const key = `${width}|${this.#deps()}`
+    if (key === this.#key && this.#lines !== undefined) return this.#lines
+    this.#key = key
+    this.#lines = this.#frame(width)
+    return this.#lines
+  }
+
+  invalidate(): void {
+    this.#key = undefined
+    this.#lines = undefined
+  }
+}

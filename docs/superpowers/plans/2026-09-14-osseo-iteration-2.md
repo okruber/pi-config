@@ -600,7 +600,7 @@ export class MemoComponent implements Component {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `tests/run-osseo-tests.sh tests/osseo-frame.test.ts`
-Expected: PASS, 17 tests.
+Expected: PASS, 16 tests.
 
 - [ ] **Step 5: Commit**
 
