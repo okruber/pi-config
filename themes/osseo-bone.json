@@ -17,7 +17,7 @@
     "signalYellow": "#8A6D00",
     "signalGreen": "#0B8C50",
     "signalBlue": "#2072B2",
- "frameLine": "#3e4739",
+ "frameLine": "#0B8C50",
  "framePendingLine": "#B85E14",
  "framePendingFill": "#f6ece6",
  "frameErrorLine": "#B7333D",

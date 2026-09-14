@@ -19,7 +19,7 @@ export const OSSEO_COLORS = {
   toolPendingBg: '#f0e3d6',
   toolSuccessBg: '#ccd6c7',
   toolErrorBg: '#eed6d3',
-  frameLine: '#3e4739',
+  frameLine: '#0B8C50',
   framePendingLine: '#B85E14',
   framePendingFill: '#f6ece6',
   frameErrorLine: '#B7333D',
