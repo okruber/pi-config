@@ -26,7 +26,8 @@
     "openrouter/z-ai/glm-5.3-flash",
     "openrouter/~z-ai/glm-latest",
     "openrouter/moonshotai/kimi-k3",
-    "openai-codex/gpt-6-astra"
+    "openai-codex/gpt-6-astra",
+    "openrouter/deepseek/deepseek-v4.1-flash"
   ],
   "subagents": {
     "modelScope": {
