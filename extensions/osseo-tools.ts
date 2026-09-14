@@ -373,6 +373,96 @@ function writeRenderers(): ToolRendererPair {
   }
 }
 
+export function editDiffStats(diff: string): { added: number; removed: number } {
+  let added = 0
+  let removed = 0
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+')) added += 1
+    else if (line.startsWith('-')) removed += 1
+  }
+  return { added, removed }
+}
+
+function editRenderers(): ToolRendererPair {
+  const head = (
+    state: FrameState,
+    args: Record<string, unknown>,
+    cwd: string,
+    colors: FrameColors,
+    diff?: string,
+  ): string => {
+    let line = `${colors.symbol(STATE_SYMBOL[state])} ${colors.title('Edit')}: ${linkedPath(pathArg(args) || '…', cwd, colors)}`
+    if (diff) {
+      const stats = editDiffStats(diff)
+      const parts: string[] = []
+      if (stats.added > 0) parts.push(colors.added(`+${stats.added}`))
+      if (stats.removed > 0) parts.push(colors.removed(`-${stats.removed}`))
+      if (parts.length > 0) line += ` ${parts.join(' ')}`
+    }
+    return line
+  }
+  return {
+    renderCall(args, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      return new MemoComponent(
+        (width) => {
+          if (state.resultPresent) return []
+          const colors = resolveFrameColors(theme, 'pending')
+          const edits = Array.isArray(ctx.args.edits) ? ctx.args.edits.length : 1
+          const lines = [colors.meta(`${countUnit(edits, 'edit')} pending`)]
+          return renderFrame(
+            { header: head('pending', ctx.args, ctx.cwd, colors), state: 'pending', sections: [{ lines }], width },
+            colors,
+          )
+        },
+        () => [state.resultPresent === true, argsKey(args)].join('|'),
+      )
+    },
+    renderResult(result, options, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      state.resultPresent = true
+      return new MemoComponent(
+        (width) => {
+          if (ctx.isError) {
+            const colors = resolveFrameColors(theme, 'error')
+            return renderFrame(
+              { header: head('error', ctx.args, ctx.cwd, colors), state: 'error', sections: [{ lines: errorLines(result, colors) }], width },
+              colors,
+            )
+          }
+          const colors = resolveFrameColors(theme, 'success')
+          const details = (result as { details?: { diff?: unknown } }).details
+          const diff = typeof details?.diff === 'string' ? details.diff : ''
+          const body =
+            diff.length > 0
+              ? renderDiff(diff, { filePath: pathArg(ctx.args) }).split('\n')
+              : [colors.meta('(no changes)')]
+          const shown = options.expanded ? body : body.slice(0, DIFF_PREVIEW_LINES)
+          const lines = [...shown]
+          if (!options.expanded && body.length > shown.length) {
+            lines.push(moreLine(body.length - shown.length, 'diff line', colors))
+          }
+          return renderFrame(
+            {
+              header: head('success', ctx.args, ctx.cwd, colors, diff || undefined),
+              state: 'success',
+              sections: [{ lines }],
+              width,
+            },
+            colors,
+          )
+        },
+        () => {
+          const details = (result as { details?: { diff?: unknown } }).details
+          return [ctx.isError, options.expanded, typeof details?.diff === 'string' ? details.diff.length : 0].join('|')
+        },
+      )
+    },
+  }
+}
+
 export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
   switch (name) {
     case 'bash':
@@ -381,6 +471,8 @@ export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
       return readRenderers()
     case 'write':
       return writeRenderers()
+    case 'edit':
+      return editRenderers()
     default:
       throw new Error(`osseo renderer not implemented yet: ${name}`)
   }

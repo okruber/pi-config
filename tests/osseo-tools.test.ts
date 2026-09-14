@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createOsseoRenderers, readCodeLines } from '../extensions/osseo-tools.ts'
+import { createOsseoRenderers, editDiffStats, readCodeLines } from '../extensions/osseo-tools.ts'
 import { resolveFrameColors } from '../extensions/osseo-frame.ts'
 import { fakeContext, fakeTheme, renderStripped, textResult } from './osseo-test-utils.ts'
 
@@ -152,4 +152,57 @@ test('write error renders the error frame', () => {
   const lines = renderStripped(result, 50)
   assert.ok(lines[0].startsWith('╭─── ✗ Write: out.ts '))
   assert.ok(lines.some((line) => line.includes('Error: EACCES')))
+})
+
+const SAMPLE_DIFF = [
+  '+ 2 const added = true',
+  '+ 3 const kept = 1',
+  '- 2 const removed = false',
+  '  4 const context = 0',
+].join('\n')
+
+test('editDiffStats counts added and removed lines', () => {
+  assert.deepEqual(editDiffStats(SAMPLE_DIFF), { added: 2, removed: 1 })
+})
+
+test('edit pending frames the pending edit count', () => {
+  const args = { path: 'a.ts', edits: [{ oldText: 'a', newText: 'b' }, { oldText: 'c', newText: 'd' }] }
+  const context = fakeContext({ args })
+  const renderers = createOsseoRenderers('edit')
+  const component = renderers.renderCall!(args, fakeTheme(), context)
+  const lines = renderStripped(component, 50)
+  assert.ok(lines[0].startsWith('╭─── ◌ Edit: a.ts '))
+  assert.ok(lines.some((line) => line.includes('2 edits pending')))
+})
+
+test('edit result shows stats in the header and the colored diff capped', () => {
+  const bigDiff = Array.from({ length: 60 }, (_, i) => `+ ${i + 1} line${i}`).join('\n')
+  const context = fakeContext({ args: { path: 'a.ts' } })
+  const renderers = createOsseoRenderers('edit')
+  const result = renderers.renderResult!(
+    textResult(['ok'], { diff: bigDiff, patch: '' }),
+    { expanded: false, isPartial: false },
+    fakeTheme(),
+    context,
+  )
+  const lines = renderStripped(result, 60)
+  assert.ok(lines[0].startsWith('╭─── ✓ Edit: a.ts '))
+  assert.ok(lines[0].includes('+60'))
+  assert.ok(lines.some((line) => line.includes('… 20 more diff lines (')))
+  const expanded = renderers.renderResult!(
+    textResult(['ok'], { diff: bigDiff, patch: '' }),
+    { expanded: true, isPartial: false },
+    fakeTheme(),
+    context,
+  )
+  assert.ok(renderStripped(expanded, 60).some((line) => line.includes('line59')))
+})
+
+test('edit error renders the error frame', () => {
+  const context = fakeContext({ args: { path: 'a.ts' }, isError: true })
+  const renderers = createOsseoRenderers('edit')
+  const result = renderers.renderResult!(textResult(['Error: oldText not found']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.ok(lines[0].startsWith('╭─── ✗ Edit: a.ts '))
+  assert.ok(lines.some((line) => line.includes('Error: oldText not found')))
 })
