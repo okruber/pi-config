@@ -561,3 +561,5 @@ export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
       })
   }
 }
+
+export default function () {}

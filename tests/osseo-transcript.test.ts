@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createRuntimeToolDefinitions, decorateBuiltInTool } from '../extensions/osseo-transcript.ts'
+import osseoFrameExtension from '../extensions/osseo-frame.ts'
+import osseoStyleExtension from '../extensions/osseo-style.ts'
+import osseoToolsExtension from '../extensions/osseo-tools.ts'
+import osseoTranscriptExtension from '../extensions/osseo-transcript.ts'
 import { fakeContext, fakeTheme, renderStripped, textResult } from './osseo-test-utils.ts'
 
 const settings = {
@@ -25,6 +29,12 @@ test('all seven built-in definitions decorate without losing identity', () => {
     assert.equal(decorated.renderShell, 'self')
     assert.equal(typeof decorated.renderCall, 'function')
     assert.equal(typeof decorated.renderResult, 'function')
+  }
+})
+
+test('osseo modules are valid extension entrypoints', () => {
+  for (const factory of [osseoFrameExtension, osseoStyleExtension, osseoToolsExtension, osseoTranscriptExtension]) {
+    assert.equal(typeof factory, 'function')
   }
 })
 

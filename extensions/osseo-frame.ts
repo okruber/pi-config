@@ -229,3 +229,5 @@ export class MemoComponent implements Component {
     this.#lines = undefined
   }
 }
+
+export default function () {}
