@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Osseo callout boxes — color iteration</title>
+<style>
+  :root { --page: #e9e3df; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: #04162a;
+    font: 14px/1.45 -apple-system, "Segoe UI", sans-serif;
+    padding: 24px 28px 60px;
+  }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .note { color: #5f6570; margin: 0 0 18px; max-width: 70ch; }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+    gap: 10px 28px;
+    margin: 14px 0 18px;
+    padding: 14px 16px;
+    background: #fbf9f7;
+    border: 1px solid #d3ccc4;
+    border-radius: 10px;
+    width: max-content;
+  }
+  .slot { display: grid; grid-template-columns: 24px 92px 78px; align-items: center; gap: 8px; }
+  .slot input[type="color"] { width: 24px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
+  .slot input[type="text"] {
+    width: 78px; font: 12px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
+    border: 1px solid #d3ccc4; border-radius: 4px; padding: 3px 6px; background: #fff; color: #04162a;
+  }
+  .slot .name { font-size: 12px; color: #5f6570; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .presets button {
+    font: 12px/1 inherit; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid #907062; background: transparent; color: #6a3026; cursor: pointer;
+  }
+  .presets button.active { background: #6a3026; color: #fbf9f7; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 26px 34px; align-items: start; }
+  .card h2 { font-size: 12px; font-weight: 600; color: #89897c; margin: 0 0 6px; letter-spacing: 0.02em; }
+  pre {
+    margin: 0;
+    font: 12.5px/1.38 ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
+    white-space: pre;
+  }
+  pre .row { display: block; }
+  .json {
+    margin-top: 22px; padding: 12px 14px; background: #1c1e1b; color: #e9e3df;
+    border-radius: 8px; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    white-space: pre; width: max-content; cursor: pointer;
+  }
+  .json:hover { outline: 2px solid #907062; }
+</style>
+</head>
+<body>
+<h1>Osseo callout boxes — color iteration</h1>
+<p class="note">
+  Browser colors approximate the terminal; judge hue and contrast here, then confirm the winner in pi.
+  Adjust the six slots or start from a preset. The JSON block at the bottom always reflects the current
+  values — click it to copy, then paste into <code>themes/osseo-bone.json</code> vars (and the matching
+  constants in <code>extensions/osseo-style.ts</code>).
+</p>
+<div class="controls" id="controls"></div>
+<div class="presets" id="presets"></div>
+<div class="grid" id="grid"></div>
+<div class="json" id="json" title="click to copy"></div>
+
+<script>
+const PAL = {
+  deepNavy: '#04162a', oxblood: '#6a3026', mossGreen: '#3e4739',
+  sageGrey: '#89897c', dustyBlue: '#8894a0', terracotta: '#a56148',
+  signalRed: '#B7333D', signalOrange: '#B85E14', signalGreen: '#0B8C50',
+  muted: '#5f6570', dim: '#73747a', toolOutput: '#4f5964',
+};
+
+const SLOTS = [
+  ['pendingFill', 'pending fill', 'toolPendingBg'],
+  ['pendingLine', 'pending border', 'framePendingLine'],
+  ['successFill', 'success fill', 'toolSuccessBg'],
+  ['successLine', 'success border', 'frameLine'],
+  ['errorFill', 'error fill', 'toolErrorBg'],
+  ['errorLine', 'error border', 'frameErrorLine'],
+];
+
+const PRESETS = {
+  'current (deep)':   { pendingFill:'#f3efec', pendingLine:'#e0c3b0', successFill:'#ded7ce', successLine:'#d3ccc4', errorFill:'#efe0dc', errorLine:'#dcb4ac' },
+  'staged pastel':    { pendingFill:'#f6ece6', pendingLine:'#e0c3b0', successFill:'#efebe6', successLine:'#d3ccc4', errorFill:'#f3e0dc', errorLine:'#dcb4ac' },
+  'deep tonal':       { pendingFill:'#e9d5ca', pendingLine:'#d9b39f', successFill:'#d8cdc7', successLine:'#c3b7ad', errorFill:'#e6cbc4', errorLine:'#d3a89e' },
+  'signal borders':   { pendingFill:'#f3efec', pendingLine:'#B85E14', successFill:'#e7e1db', successLine:'#8a8578', errorFill:'#efe0dc', errorLine:'#B7333D' },
+  'barely there':     { pendingFill:'#f1ece8', pendingLine:'#ded4cb', successFill:'#e7e2dc', successLine:'#d3ccc4', errorFill:'#f2e6e2', errorLine:'#dec2bb' },
+  'paper lift':       { pendingFill:'#f8f2ec', pendingLine:'#dcc0ae', successFill:'#f5f2ee', successLine:'#c9bfb6', errorFill:'#f7e9e5', errorLine:'#d9b3aa' },
+};
+
+let scheme = { ...PRESETS['current (deep)'] };
+let activePreset = 'current (deep)';
+
+const mono = {
+  title: (t) => `<b style="color:${PAL.deepNavy}">${t}</b>`,
+  subject: (t) => `<span style="color:${PAL.muted}">${t}</span>`,
+  meta: (t) => `<span style="color:${PAL.dim}">${t}</span>`,
+  body: (t) => `<span style="color:${PAL.toolOutput}">${t}</span>`,
+  gutter: (t) => `<span style="color:${PAL.dim}">${t}</span>`,
+  added: (t) => `<span style="color:${PAL.mossGreen}">${t}</span>`,
+  removed: (t) => `<span style="color:${PAL.oxblood}">${t}</span>`,
+  kw: (t) => `<span style="color:${PAL.oxblood}">${t}</span>`,
+  num: (t) => `<span style="color:#52677d">${t}</span>`,
+  err: (t) => `<span style="color:${PAL.oxblood}">${t}</span>`,
+  sym: (state, ch) => {
+    const c = state === 'pending' ? PAL.signalOrange : state === 'error' ? PAL.signalRed : PAL.signalGreen;
+    return `<span style="color:${c}">${ch}</span>`;
+  },
+};
+
+function frameLine(state, text) {
+  return `<span style="color:${scheme[state + 'Line']}">${text}</span>`;
+}
+
+function row(state, inner) {
+  return `<span class="row" style="background:${scheme[state + 'Fill']}">${inner}</span>\n`;
+}
+
+function bar(state, left, right, label, width) {
+  const l = `${left}${'─'.repeat(3)}`;
+  if (!label) return frameLine(state, `${l}${'─'.repeat(width - 5)}${right}`);
+  const fill = '─'.repeat(Math.max(0, width - 5 - label.length - 2));
+  return `${frameLine(state, l)} ${label} ${frameLine(state, fill + right)}`;
+}
+
+function content(state, text, width) {
+  const inner = ` ${text}`.padEnd(width - 3, ' ');
+  return `${frameLine(state, '│')}${inner}${frameLine(state, '│')}`;
+}
+
+function frame(state, { header, sections }, width = 74) {
+  let out = row(state, bar(state, '╭', '╮', header, width));
+  sections.forEach((s, i) => {
+    if (s.label || i > 0) out += row(state, bar(state, '├', '┤', s.label, width));
+    for (const line of s.lines) out += row(state, content(state, line, width));
+  });
+  out += row(state, bar(state, '╰', '╯', undefined, width));
+  return out;
+}
+
+const CARDS = [
+  ['bash · settled', () => frame('success', {
+    sections: [
+      { lines: [`${mono.meta('$ ')}npm ${mono.num('test')}`] },
+      { label: mono.title('Output'), lines: [mono.body('12 passing'), mono.meta('[Took 4.2s]')] },
+    ],
+  })],
+  ['bash · pending (running)', () => frame('pending', {
+    sections: [{ lines: [`${mono.meta('$ ')}npm ${mono.num('test')}`, mono.meta('running · 2s')] }],
+  })],
+  ['bash · error', () => frame('error', {
+    sections: [
+      { lines: [`${mono.meta('$ ')}${mono.num('false')}`] },
+      { label: mono.title('Output'), lines: [mono.body('Command exited with code 1')] },
+    ],
+  })],
+  ['read · settled', () => frame('success', {
+    header: `${mono.sym('success', '✓')} ${mono.title('Read')}: ${mono.subject('extensions/osseo-frame.ts')}`,
+    sections: [{ lines: [
+      `${mono.gutter(' 1 ')}${mono.kw('export')} ${mono.kw('const')} v0 = ${mono.num('0')}`,
+      `${mono.gutter(' 2 ')}${mono.kw('export')} ${mono.kw('const')} v1 = ${mono.num('1')}`,
+      `${mono.gutter(' 3 ')}${mono.kw('export')} ${mono.kw('const')} v2 = ${mono.num('2')}`,
+      `${mono.gutter('… ')}${mono.meta('8 more lines (ctrl+o to expand)')}`,
+    ] }],
+  })],
+  ['edit · settled', () => frame('success', {
+    header: `${mono.sym('success', '✓')} ${mono.title('Edit')}: ${mono.subject('demo.ts')} ${mono.added('+2')} ${mono.removed('-1')}`,
+    sections: [{ lines: [
+      mono.added('+ 12 const a = 1'),
+      mono.added('+ 13 const b = 2'),
+      mono.removed('- 12 const old = 0'),
+      mono.body('  14 const ctx = 3'),
+    ] }],
+  })],
+  ['write · pending (streaming)', () => frame('pending', {
+    header: `${mono.sym('pending', '◌')} ${mono.title('Write')}: ${mono.subject('demo.ts')}`,
+    sections: [{ lines: [
+      mono.body('line17'), mono.body('line18'), mono.body('line19'), mono.meta('(streaming…)'),
+    ] }],
+  })],
+  ['read · error', () => frame('error', {
+    header: `${mono.sym('error', '✗')} ${mono.title('Read')}: ${mono.subject('/nonexistent')}`,
+    sections: [{ lines: [mono.err('Error: ENOENT: no such file or directory')] }],
+  })],
+  ['grep · settled (unframed, context)', () =>
+    `${mono.sym('success', '✓')} ${mono.title('Grep')}: ${mono.subject('/renderFrame/ in extensions')}${mono.meta(' · 10 matches')}\n` +
+    `${mono.meta('├─')} ${mono.body('extensions/osseo-frame.ts:101: hit')}\n` +
+    `${mono.meta('├─')} ${mono.body('extensions/osseo-tools.ts:42: hit')}\n` +
+    `${mono.meta('…')} ${mono.meta('8 more matches (ctrl+o to expand)')}\n`,
+  ],
+];
+
+function renderCards() {
+  document.getElementById('grid').innerHTML = CARDS.map(([label, build]) =>
+    `<div class="card"><h2>${label}</h2><pre>${build()}</pre></div>`
+  ).join('');
+}
+
+function renderJson() {
+  document.getElementById('json').textContent =
+    SLOTS.map(([key, , jsonName]) => `  "${jsonName}": "${scheme[key]}",`).join('\n') +
+    '\n\n— click to copy —';
+}
+
+function renderControls() {
+  document.getElementById('controls').innerHTML = SLOTS.map(([key, name]) => `
+    <label class="slot">
+      <input type="color" data-key="${key}" value="${scheme[key]}">
+      <span class="name">${name}</span>
+      <input type="text" data-key="${key}" value="${scheme[key]}" spellcheck="false">
+    </label>`).join('');
+  document.querySelectorAll('.slot input').forEach((input) => {
+    input.addEventListener('input', (e) => {
+      const key = e.target.dataset.key;
+      const value = e.target.value;
+      if (!/^#[0-9a-fA-F]{6}$/.test(value)) return;
+      scheme[key] = value;
+      activePreset = '';
+      syncInputs(key, value);
+      renderCards(); renderJson(); renderPresets();
+    });
+  });
+}
+
+function syncInputs(key, value) {
+  document.querySelectorAll(`input[data-key="${key}"]`).forEach((i) => { if (i.value !== value) i.value = value; });
+}
+
+function renderPresets() {
+  document.getElementById('presets').innerHTML = Object.keys(PRESETS).map((name) =>
+    `<button data-preset="${name}" class="${name === activePreset ? 'active' : ''}">${name}</button>`
+  ).join('');
+  document.querySelectorAll('.presets button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activePreset = btn.dataset.preset;
+      scheme = { ...PRESETS[activePreset] };
+      renderControls(); renderCards(); renderJson(); renderPresets();
+    });
+  });
+}
+
+document.getElementById('json').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('json').textContent.replace(/\n\n— click to copy —/, ''));
+});
+
+renderControls(); renderCards(); renderJson(); renderPresets();
+</script>
+</body>
+</html>
