@@ -86,6 +86,9 @@ const SLOTS = [
 ];
 
 const PRESETS = {
+  'signal tint':      { pendingFill:'#e1cebf', pendingLine:'#e0c3b0', successFill:'#c5d5c8', successLine:'#d3ccc4', errorFill:'#e2cac8', errorLine:'#dcb4ac' },
+  'tint + border':    { pendingFill:'#e1cebf', pendingLine:'#B85E14', successFill:'#c5d5c8', successLine:'#0B8C50', errorFill:'#e2cac8', errorLine:'#B7333D' },
+  'dock strong':      { pendingFill:'#ddc3ae', pendingLine:'#B85E14', successFill:'#b2cdbb', successLine:'#0B8C50', errorFill:'#ddb9b8', errorLine:'#B7333D' },
   'current (deep)':   { pendingFill:'#f3efec', pendingLine:'#e0c3b0', successFill:'#ded7ce', successLine:'#d3ccc4', errorFill:'#efe0dc', errorLine:'#dcb4ac' },
   'staged pastel':    { pendingFill:'#f6ece6', pendingLine:'#e0c3b0', successFill:'#efebe6', successLine:'#d3ccc4', errorFill:'#f3e0dc', errorLine:'#dcb4ac' },
   'deep tonal':       { pendingFill:'#e9d5ca', pendingLine:'#d9b39f', successFill:'#d8cdc7', successLine:'#c3b7ad', errorFill:'#e6cbc4', errorLine:'#d3a89e' },
@@ -94,8 +97,8 @@ const PRESETS = {
   'paper lift':       { pendingFill:'#f8f2ec', pendingLine:'#dcc0ae', successFill:'#f5f2ee', successLine:'#c9bfb6', errorFill:'#f7e9e5', errorLine:'#d9b3aa' },
 };
 
-let scheme = { ...PRESETS['current (deep)'] };
-let activePreset = 'current (deep)';
+let scheme = { ...PRESETS['signal tint'] };
+let activePreset = 'signal tint';
 
 const mono = {
   title: (t) => `<b style="color:${PAL.deepNavy}">${t}</b>`,
