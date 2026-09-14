@@ -295,12 +295,92 @@ function readRenderers(): ToolRendererPair {
   }
 }
 
+function writeRenderers(): ToolRendererPair {
+  const contentOf = (args: Record<string, unknown>): string => stringArg(args, 'content') ?? ''
+  const head = (
+    state: FrameState,
+    args: Record<string, unknown>,
+    cwd: string,
+    colors: FrameColors,
+    meta?: string,
+  ): string => {
+    let line = `${colors.symbol(STATE_SYMBOL[state])} ${colors.title('Write')}: ${linkedPath(pathArg(args) || '…', cwd, colors)}`
+    if (meta) line += colors.meta(` · ${meta}`)
+    return line
+  }
+  return {
+    renderCall(args, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      return new MemoComponent(
+        (width) => {
+          if (state.resultPresent) return []
+          const colors = resolveFrameColors(theme, 'pending')
+          const content = contentOf(ctx.args)
+          const language = getLanguageFromPath(pathArg(ctx.args))
+          const lines: string[] = []
+          if (content.length > 0) {
+            const raw = content.split('\n')
+            const tail = raw.length > CODE_PREVIEW_LINES
+            const shown = tail ? raw.slice(-CODE_PREVIEW_LINES) : raw
+            if (tail) lines.push(colors.meta(`… ${raw.length - shown.length} earlier lines`))
+            lines.push(...highlightCode(shown.join('\n'), language))
+          }
+          if (!ctx.argsComplete) lines.push(colors.meta('(streaming…)'))
+          return renderFrame(
+            { header: head('pending', ctx.args, ctx.cwd, colors), state: 'pending', sections: [{ lines }], width },
+            colors,
+          )
+        },
+        () => [state.resultPresent === true, ctx.argsComplete, contentOf(ctx.args).length].join('|'),
+      )
+    },
+    renderResult(result, options, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      state.resultPresent = true
+      return new MemoComponent(
+        (width) => {
+          if (ctx.isError) {
+            const colors = resolveFrameColors(theme, 'error')
+            return renderFrame(
+              { header: head('error', ctx.args, ctx.cwd, colors), state: 'error', sections: [{ lines: errorLines(result, colors) }], width },
+              colors,
+            )
+          }
+          const colors = resolveFrameColors(theme, 'success')
+          const content = contentOf(ctx.args)
+          const raw = content.split('\n')
+          const language = getLanguageFromPath(pathArg(ctx.args))
+          const shown = options.expanded ? raw : raw.slice(0, CODE_PREVIEW_LINES)
+          const lines = highlightCode(shown.join('\n'), language)
+          if (!options.expanded && raw.length > shown.length) {
+            lines.push(`${colors.meta(`… ${raw.length - shown.length} more lines `)}${expandHint(colors)}`)
+          }
+          return renderFrame(
+            {
+              header: head('success', ctx.args, ctx.cwd, colors, countUnit(raw.length, 'line')),
+              state: 'success',
+              sections: [{ lines }],
+              width,
+            },
+            colors,
+          )
+        },
+        () => [ctx.isError, options.expanded, contentOf(ctx.args).length].join('|'),
+      )
+    },
+  }
+}
+
 export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
   switch (name) {
     case 'bash':
       return bashRenderers()
     case 'read':
       return readRenderers()
+    case 'write':
+      return writeRenderers()
     default:
       throw new Error(`osseo renderer not implemented yet: ${name}`)
   }

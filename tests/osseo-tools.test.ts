@@ -120,3 +120,36 @@ test('read image result renders a placeholder body', () => {
   const lines = renderStripped(result, 50)
   assert.ok(lines.some((line) => line.includes('(image)')))
 })
+
+test('write pending frames streaming content with a streaming marker', () => {
+  const content = Array.from({ length: 20 }, (_, i) => `line${i}`).join('\n')
+  const context = fakeContext({ args: { path: 'out.ts', content }, argsComplete: false })
+  const renderers = createOsseoRenderers('write')
+  const component = renderers.renderCall!({ path: 'out.ts', content }, fakeTheme(), context)
+  const lines = renderStripped(component, 50)
+  assert.ok(lines[0].startsWith('╭─── ◌ Write: out.ts '))
+  assert.ok(lines.some((line) => line.includes('… 8 earlier lines')))
+  assert.ok(lines.some((line) => line.includes('line19')))
+  assert.ok(lines.some((line) => line.includes('(streaming…)')))
+})
+
+test('write result shows line count meta and a capped preview', () => {
+  const content = Array.from({ length: 20 }, (_, i) => `line${i}`).join('\n')
+  const context = fakeContext({ args: { path: 'out.ts', content } })
+  const renderers = createOsseoRenderers('write')
+  const result = renderers.renderResult!(textResult(['ok']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 50)
+  assert.ok(lines[0].startsWith('╭─── ✓ Write: out.ts '))
+  assert.ok(lines[0].includes('· 20 lines'))
+  assert.ok(lines.some((line) => line.includes('line0')))
+  assert.ok(lines.some((line) => line.includes('… 8 more lines (')))
+})
+
+test('write error renders the error frame', () => {
+  const context = fakeContext({ args: { path: 'out.ts', content: 'x' }, isError: true })
+  const renderers = createOsseoRenderers('write')
+  const result = renderers.renderResult!(textResult(['Error: EACCES']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 50)
+  assert.ok(lines[0].startsWith('╭─── ✗ Write: out.ts '))
+  assert.ok(lines.some((line) => line.includes('Error: EACCES')))
+})
