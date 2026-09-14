@@ -1840,7 +1840,7 @@ Expected: no output.
 - [ ] **Step 6: Run the full suite**
 
 Run: `tests/run-osseo-tests.sh`
-Expected: PASS, 28 tests across `osseo-frame.test.ts`, `osseo-tools.test.ts`, `osseo-transcript.test.ts`.
+Expected: PASS, 44 tests across `osseo-frame.test.ts`, `osseo-tools.test.ts`, `osseo-transcript.test.ts`.
 
 - [ ] **Step 7: Commit**
 
