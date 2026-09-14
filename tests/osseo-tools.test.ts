@@ -206,3 +206,69 @@ test('edit error renders the error frame', () => {
   assert.ok(lines[0].startsWith('╭─── ✗ Edit: a.ts '))
   assert.ok(lines.some((line) => line.includes('Error: oldText not found')))
 })
+
+test('grep pending is a flat status line', () => {
+  const context = fakeContext({ args: { pattern: 'renderFrame', path: 'extensions' } })
+  const renderers = createOsseoRenderers('grep')
+  const component = renderers.renderCall!({ pattern: 'renderFrame', path: 'extensions' }, fakeTheme(), context)
+  assert.deepEqual(renderStripped(component, 60), ['◌ Grep: /renderFrame/ in extensions'])
+})
+
+test('grep result renders a capped tree list with counts', () => {
+  const matches = Array.from({ length: 10 }, (_, i) => `src/f${i}.ts:${i + 1}: match`)
+  const context = fakeContext({ args: { pattern: 'match' } })
+  const renderers = createOsseoRenderers('grep')
+  const result = renderers.renderResult!(textResult(matches), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.equal(lines[0], '✓ Grep: /match/ in . · 10 matches')
+  assert.ok(lines[1].startsWith('├─ src/f0.ts:1: match'))
+  assert.ok(lines.some((line) => line.startsWith('… 2 more matches (')))
+})
+
+test('grep zero matches renders the empty marker', () => {
+  const context = fakeContext({ args: { pattern: 'zzz' } })
+  const renderers = createOsseoRenderers('grep')
+  const result = renderers.renderResult!(textResult([]), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.equal(lines[0], '✓ Grep: /zzz/ in . · 0 matches')
+  assert.deepEqual(lines[1], '(no matches)')
+})
+
+test('grep error renders the error header and message', () => {
+  const context = fakeContext({ args: { pattern: '(' }, isError: true })
+  const renderers = createOsseoRenderers('grep')
+  const result = renderers.renderResult!(textResult(['Error: invalid regex']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.equal(lines[0], '✗ Grep: /(/ in .')
+  assert.deepEqual(lines[1], 'Error: invalid regex')
+})
+
+test('find result lists files with counts', () => {
+  const context = fakeContext({ args: { pattern: '*.ts', path: 'src' } })
+  const renderers = createOsseoRenderers('find')
+  const result = renderers.renderResult!(textResult(['a.ts', 'b.ts']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.equal(lines[0], '✓ Find: *.ts in src · 2 files')
+  assert.ok(lines[1].startsWith('├─ a.ts'))
+  assert.ok(lines[2].startsWith('└─ b.ts'))
+})
+
+test('ls result lists entries', () => {
+  const context = fakeContext({ args: { path: 'src' } })
+  const renderers = createOsseoRenderers('ls')
+  const result = renderers.renderResult!(textResult(['a.ts', 'lib/']), { expanded: false, isPartial: false }, fakeTheme(), context)
+  const lines = renderStripped(result, 60)
+  assert.equal(lines[0], '✓ Ls: src · 2 entries')
+})
+
+test('search results mark truncation in the meta', () => {
+  const context = fakeContext({ args: { pattern: '*.ts' } })
+  const renderers = createOsseoRenderers('find')
+  const result = renderers.renderResult!(
+    textResult(['a.ts'], { resultLimitReached: 100 }),
+    { expanded: false, isPartial: false },
+    fakeTheme(),
+    context,
+  )
+  assert.equal(renderStripped(result, 60)[0], '✓ Find: *.ts in . · 1 file · truncated')
+})

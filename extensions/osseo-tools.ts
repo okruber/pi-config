@@ -463,6 +463,71 @@ function editRenderers(): ToolRendererPair {
   }
 }
 
+type SearchListConfig = {
+  title: string
+  unit: string
+  emptyText: string
+  subject: (args: Record<string, unknown>) => string
+}
+
+function searchListRenderers(config: SearchListConfig): ToolRendererPair {
+  return {
+    renderCall(args, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      return new MemoComponent(
+        (width) => {
+          if (state.resultPresent) return []
+          const colors = resolveFrameColors(theme, 'pending')
+          return [truncateToWidth(statusHeader({ state: 'pending', title: config.title, subject: config.subject(ctx.args) }, colors), width, '')]
+        },
+        () => [state.resultPresent === true, argsKey(args)].join('|'),
+      )
+    },
+    renderResult(result, options, theme, context) {
+      const ctx = context as unknown as RenderContextLike
+      const state = ctx.state
+      state.resultPresent = true
+      return new MemoComponent(
+        (width) => {
+          const subject = config.subject(ctx.args)
+          if (ctx.isError) {
+            const colors = resolveFrameColors(theme, 'error')
+            return [
+              statusHeader({ state: 'error', title: config.title, subject }, colors),
+              ...errorLines(result, colors),
+            ].map((line) => truncateToWidth(line, width, ''))
+          }
+          const colors = resolveFrameColors(theme, 'success')
+          const { body } = stripNoticeFooter(resultText(result))
+          const items = body.split('\n').filter((line) => line.trim().length > 0)
+          const meta = [countUnit(items.length, config.unit)]
+          const details = (result as { details?: Record<string, unknown> }).details ?? {}
+          if (
+            (details.truncation as { truncated?: boolean } | undefined)?.truncated === true ||
+            details.matchLimitReached !== undefined ||
+            details.resultLimitReached !== undefined ||
+            details.entryLimitReached !== undefined
+          ) {
+            meta.push('truncated')
+          }
+          const header = statusHeader({ state: 'success', title: config.title, subject, meta }, colors)
+          const rows =
+            items.length === 0
+              ? [colors.meta(`(${config.emptyText})`)]
+              : treeList(
+                  items.map((line) => colors.body(line)),
+                  { expanded: options.expanded, maxCollapsed: LIST_PREVIEW_ITEMS, unit: config.unit },
+                  colors,
+                )
+          return [header, ...rows].map((line) => truncateToWidth(line, width, ''))
+        },
+        () => [ctx.isError, options.expanded, resultText(result).length].join('|'),
+      )
+    },
+  }
+}
+
 export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
   switch (name) {
     case 'bash':
@@ -473,7 +538,26 @@ export function createOsseoRenderers(name: BuiltInToolName): ToolRendererPair {
       return writeRenderers()
     case 'edit':
       return editRenderers()
-    default:
-      throw new Error(`osseo renderer not implemented yet: ${name}`)
+    case 'grep':
+      return searchListRenderers({
+        title: 'Grep',
+        unit: 'match',
+        emptyText: 'no matches',
+        subject: (args) => `/${normalizeInline(stringArg(args, 'pattern') ?? '?')}/ in ${normalizeInline(stringArg(args, 'path') ?? '.')}`,
+      })
+    case 'find':
+      return searchListRenderers({
+        title: 'Find',
+        unit: 'file',
+        emptyText: 'no files found',
+        subject: (args) => `${normalizeInline(stringArg(args, 'pattern') ?? '…')} in ${normalizeInline(stringArg(args, 'path') ?? '.')}`,
+      })
+    case 'ls':
+      return searchListRenderers({
+        title: 'Ls',
+        unit: 'entry',
+        emptyText: 'empty directory',
+        subject: (args) => normalizeInline(stringArg(args, 'path') ?? '.'),
+      })
   }
 }
