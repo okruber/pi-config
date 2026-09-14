@@ -30,9 +30,9 @@
     "peach": "#a56148",
     "selectedBg": "#d8cdc7",
     "userBg": "#ddd4ce",
-    "toolPendingBg": "#f0e3d6",
-    "toolSuccessBg": "#ccd6c7",
-    "toolErrorBg": "#eed6d3"
+    "toolPendingBg": "#f4dbbd",
+    "toolSuccessBg": "#bfe6cc",
+    "toolErrorBg": "#f2ccd0"
   },
   "colors": {
     "accent": "oxblood",
