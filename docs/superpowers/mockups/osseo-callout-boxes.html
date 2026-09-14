@@ -46,7 +46,7 @@
     font: 12.5px/1.38 ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
     white-space: pre;
   }
-  pre .row { display: block; }
+  .frame { display: inline-block; vertical-align: top; }
   .json {
     margin-top: 22px; padding: 12px 14px; background: #1c1e1b; color: #e9e3df;
     border-radius: 8px; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
@@ -86,19 +86,14 @@ const SLOTS = [
 ];
 
 const PRESETS = {
-  'signal tint':      { pendingFill:'#e1cebf', pendingLine:'#e0c3b0', successFill:'#c5d5c8', successLine:'#d3ccc4', errorFill:'#e2cac8', errorLine:'#dcb4ac' },
-  'tint + border':    { pendingFill:'#e1cebf', pendingLine:'#B85E14', successFill:'#c5d5c8', successLine:'#0B8C50', errorFill:'#e2cac8', errorLine:'#B7333D' },
-  'dock strong':      { pendingFill:'#ddc3ae', pendingLine:'#B85E14', successFill:'#b2cdbb', successLine:'#0B8C50', errorFill:'#ddb9b8', errorLine:'#B7333D' },
-  'current (deep)':   { pendingFill:'#f3efec', pendingLine:'#e0c3b0', successFill:'#ded7ce', successLine:'#d3ccc4', errorFill:'#efe0dc', errorLine:'#dcb4ac' },
-  'staged pastel':    { pendingFill:'#f6ece6', pendingLine:'#e0c3b0', successFill:'#efebe6', successLine:'#d3ccc4', errorFill:'#f3e0dc', errorLine:'#dcb4ac' },
-  'deep tonal':       { pendingFill:'#e9d5ca', pendingLine:'#d9b39f', successFill:'#d8cdc7', successLine:'#c3b7ad', errorFill:'#e6cbc4', errorLine:'#d3a89e' },
+  'borders + tint':   { pendingFill:'#f0e3d6', pendingLine:'#B85E14', successFill:'#ccd6c7', successLine:'#3e4739', errorFill:'#eed6d3', errorLine:'#B7333D' },
+  'borders + tint+':  { pendingFill:'#ead9c8', pendingLine:'#B85E14', successFill:'#c2d2bc', successLine:'#3e4739', errorFill:'#e8cbc6', errorLine:'#B7333D' },
   'signal borders':   { pendingFill:'#f3efec', pendingLine:'#B85E14', successFill:'#e7e1db', successLine:'#8a8578', errorFill:'#efe0dc', errorLine:'#B7333D' },
-  'barely there':     { pendingFill:'#f1ece8', pendingLine:'#ded4cb', successFill:'#e7e2dc', successLine:'#d3ccc4', errorFill:'#f2e6e2', errorLine:'#dec2bb' },
   'paper lift':       { pendingFill:'#f8f2ec', pendingLine:'#dcc0ae', successFill:'#f5f2ee', successLine:'#c9bfb6', errorFill:'#f7e9e5', errorLine:'#d9b3aa' },
 };
 
-let scheme = { ...PRESETS['paper lift'] };
-let activePreset = 'paper lift';
+let scheme = { ...PRESETS['borders + tint'] };
+let activePreset = 'borders + tint';
 
 const mono = {
   title: (t) => `<b style="color:${PAL.deepNavy}">${t}</b>`,
@@ -121,9 +116,7 @@ function frameLine(state, text) {
   return `<span style="color:${scheme[state + 'Line']}">${text}</span>`;
 }
 
-function row(state, inner) {
-  return `<span class="row" style="background:${scheme[state + 'Fill']}">${inner}</span>\n`;
-}
+
 
 function visible(text) { return text.replace(/<[^>]*>/g, ''); }
 
@@ -140,13 +133,13 @@ function content(state, text, width) {
 }
 
 function frame(state, { header, sections }, width = 74) {
-  let out = row(state, bar(state, '╭', '╮', header, width));
+  let out = bar(state, '╭', '╮', header, width) + '\n';
   sections.forEach((s, i) => {
-    if (s.label || i > 0) out += row(state, bar(state, '├', '┤', s.label, width));
-    for (const line of s.lines) out += row(state, content(state, line, width));
+    if (s.label || i > 0) out += bar(state, '├', '┤', s.label, width) + '\n';
+    for (const line of s.lines) out += content(state, line, width) + '\n';
   });
-  out += row(state, bar(state, '╰', '╯', undefined, width));
-  return out;
+  out += bar(state, '╰', '╯', undefined, width);
+  return `<span class="frame" style="background:${scheme[state + 'Fill']}">${out}</span>\n`;
 }
 
 const CARDS = [
