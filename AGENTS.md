@@ -33,6 +33,21 @@ and a stale comment is worse than none.
 resource "google_service_account" "pr_review" {
 ```
 
+## Doing the work
+
+When a discussion reaches a decision, carry it out yourself. Run the command,
+edit the file, commit, push, and open the pull request with your own tools.
+Never end a turn by telling Olle to run, open, paste, or create something you
+can do. Do not ask "Want me to...?" for a step inside the agreed scope, because
+the agreement already covers it. Keep going until the change is implemented and
+verified, then report what you did.
+
+Stop only when a step needs something you cannot get: a credential, a login, a
+physical action, or a decision Olle has not made. Also stop before a destructive
+or irreversible action outside the agreed scope, such as a force-push, a merge
+to main, deleting data, or messaging other people. In that case, name the one
+blocker in one sentence.
+
 ## Load before you act
 
 Editing anything under `~/.pi/agent/` or `~/.agents/skills/`? Read
