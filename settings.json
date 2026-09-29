@@ -4,7 +4,6 @@
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "max",
   "packages": [
-    "npm:@llblab/pi-telegram",
     "git:github.com/obra/superpowers",
     "npm:pi-subagents",
     "npm:pi-mcp-adapter",
