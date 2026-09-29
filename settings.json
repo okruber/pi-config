@@ -1,12 +1,12 @@
 {
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.87.1",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "max",
+  "defaultTools": ["+codemode"],
   "packages": [
     "git:github.com/obra/superpowers",
     "npm:pi-subagents",
-    "npm:pi-mcp-adapter",
     "npm:pi-web-access",
     "npm:@ff-labs/pi-fff",
     "npm:pi-cache-optimizer",
@@ -18,15 +18,13 @@
   ],
   "enabledModels": [
     "anthropic/claude-sonnet-5",
-    "anthropic/claude-opus-5",
-    "ornith/ornith-1.5-35b-a3b",
     "openai-codex/gpt-5.6-luna",
     "openai-codex/gpt-5.6-sol",
-    "openrouter/z-ai/glm-5.3-flash",
     "openrouter/~z-ai/glm-latest",
-    "openrouter/moonshotai/kimi-k3",
     "openai-codex/gpt-6-astra",
-    "openrouter/deepseek/deepseek-v4.1-flash"
+    "openrouter/deepseek/deepseek-v4.1-flash",
+    "splash/incoai/Qwen3.6-35B-A3B-Splash",
+    "anthropic/claude-opus-5-5"
   ],
   "subagents": {
     "modelScope": {
