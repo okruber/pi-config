@@ -1,9 +1,11 @@
 {
-  "lastChangelogVersion": "0.87.1",
+  "lastChangelogVersion": "1.0.3",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "max",
-  "defaultTools": ["+codemode"],
+  "defaultTools": [
+    "+codemode"
+  ],
   "packages": [
     "git:github.com/obra/superpowers",
     "npm:pi-subagents",
@@ -17,21 +19,22 @@
     "!skills/google-agents-cli-*"
   ],
   "enabledModels": [
-    "anthropic/claude-sonnet-5",
-    "openai-codex/gpt-5.6-luna",
-    "openai-codex/gpt-5.6-sol",
     "openrouter/~z-ai/glm-latest",
-    "openai-codex/gpt-6-astra",
     "openrouter/deepseek/deepseek-v4.1-flash",
-    "splash/incoai/Qwen3.6-35B-A3B-Splash",
-    "anthropic/claude-opus-5-5"
+    "anthropic/claude-opus-5-5",
+    "openai-codex/gpt-6.1-sol",
+    "anthropic/claude-sonnet-5-5",
+    "openai-codex/gpt-6-luna",
+    "openai-codex/gpt-6-astra"
   ],
   "subagents": {
     "modelScope": {
       "enforce": true,
       "allow": [
         "anthropic/claude-sonnet-5",
+        "anthropic/claude-sonnet-5-5",
         "anthropic/claude-opus-5",
+        "anthropic/claude-opus-5-5",
         "openrouter/deepseek/deepseek-v4-flash-0731",
         "openrouter/z-ai/glm-5.3",
         "llama/qwen3.6-35b-a3b",
