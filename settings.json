@@ -11,9 +11,7 @@
     "npm:pi-subagents",
     "npm:pi-web-access",
     "npm:@ff-labs/pi-fff",
-    "npm:pi-cache-optimizer",
-    "https://github.com/earendil-works/pi-transcribe",
-    "npm:@ogulcancelik/pi-herdr"
+    "npm:pi-cache-optimizer"
   ],
   "skills": [
     "!skills/google-agents-cli-*"
