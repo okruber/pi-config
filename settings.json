@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.0.3",
+  "lastChangelogVersion": "1.5.0",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "max",
@@ -8,7 +8,6 @@
   ],
   "packages": [
     "git:github.com/obra/superpowers",
-    "npm:pi-subagents",
     "npm:pi-web-access",
     "npm:@ff-labs/pi-fff",
     "npm:pi-cache-optimizer"
@@ -17,31 +16,13 @@
     "!skills/google-agents-cli-*"
   ],
   "enabledModels": [
-    "openrouter/~z-ai/glm-latest",
-    "openrouter/deepseek/deepseek-v4.1-flash",
     "anthropic/claude-opus-5-5",
     "openai-codex/gpt-6.1-sol",
-    "anthropic/claude-sonnet-5-5",
-    "openai-codex/gpt-6-luna",
-    "openai-codex/gpt-6-astra"
+    "anthropic/claude-sonnet-5-5"
   ],
-  "subagents": {
-    "modelScope": {
-      "enforce": true,
-      "allow": [
-        "anthropic/claude-sonnet-5",
-        "anthropic/claude-sonnet-5-5",
-        "anthropic/claude-opus-5",
-        "anthropic/claude-opus-5-5",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
-        "openrouter/z-ai/glm-5.3",
-        "llama/qwen3.6-35b-a3b",
-        "ornith/ornith-1.5-35b-a3b",
-        "openai-codex/gpt-5.6-luna"
-      ],
-      "strict": true
-    }
-  },
   "theme": "osseo-bone",
-  "showCacheMissNotices": false
+  "showCacheMissNotices": false,
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-web-access\",\"scope\":\"user\"}": "0.46.0"
+  }
 }

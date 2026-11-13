@@ -35,5 +35,5 @@ link prompts
 link AGENTS.md
 
 echo "==> Done. Restart pi to pick up theme/extension changes."
-echo "    Reminder: packages (superpowers, pi-subagents, pi-telegram) reinstall"
+echo "    Reminder: packages (superpowers, pi-telegram) reinstall"
 echo "    from settings.json on pi startup; skills come from the 'skills' repo."
