@@ -1,122 +1,96 @@
 {
   "providers": {
-    "llama": {
-      "baseUrl": "http://127.0.0.1:8090/v1",
-      "api": "openai-completions",
-      "apiKey": "llama",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false,
-        "thinkingFormat": "qwen-chat-template",
-        "chatTemplateKwargs": {
-          "enable_thinking": {
-            "$var": "thinking.enabled",
-            "omitWhenOff": true
+    "anthropic": {
+      "modelOverrides": {
+        "claude-fable-5-2": {
+          "compat": {
+            "allowedFallbackModels": []
           }
         }
-      },
-      "models": [
-        {
-          "id": "qwen3.6-35b-a3b",
-          "name": "Qwen 3.6 35B A3B MoE Q4_K_M (llama-server :8090)",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        }
-      ]
+      }
     },
-    "ornith": {
-      "baseUrl": "http://127.0.0.1:8091/v1",
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
       "api": "openai-completions",
-      "apiKey": "ornith",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false,
-        "thinkingFormat": "qwen-chat-template",
-        "chatTemplateKwargs": {
-          "enable_thinking": {
-            "$var": "thinking.enabled",
-            "omitWhenOff": true
-          }
-        }
-      },
       "models": [
         {
-          "id": "ornith-1.5-35b-a3b",
-          "name": "Ornith 1.5 35B A3B MoE Q4_K_M (llama-server :8091)",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        }
-      ]
-    },
-    "dspark": {
-      "baseUrl": "http://127.0.0.1:8099/v1",
-      "api": "openai-completions",
-      "apiKey": "dspark",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": true
-      },
-      "models": [
-        {
-          "id": "Qwen3.8-27B-4bit",
-          "name": "Qwen 3.8 27B MLX-4bit + DSpark (mlx-dspark :8099)",
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash (Parasail FP8)",
           "reasoning": true,
           "thinkingLevelMap": {
-            "minimal": "low",
+            "off": "none",
+            "minimal": null,
             "low": "low",
-            "medium": "medium",
-            "high": null,
-            "xhigh": "xhigh",
-            "max": null
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": "max"
           },
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 32768,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 384000,
+          "cost": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.006,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "openRouterRouting": {
+              "zdr": true,
+              "data_collection": "deny",
+              "order": [
+                "parasail"
+              ],
+              "quantizations": [
+                "fp8"
+              ],
+              "allow_fallbacks": false
+            }
+          }
         }
       ]
     },
-    "lmstudio": {
-      "baseUrl": "http://localhost:1234/v1",
+    "splash": {
+      "baseUrl": "http://127.0.0.1:8000/v1",
       "api": "openai-completions",
-      "apiKey": "lm-studio",
+      "apiKey": "splash",
       "compat": {
         "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false
+        "supportsReasoningEffort": true,
+        "maxTokensField": "max_tokens"
       },
       "models": [
         {
-          "id": "gemma-4-26b-a4b-it-qat-mlx",
-          "name": "Gemma 4 26B A4B QAT MLX-4bit (LM Studio)",
-          "reasoning": false,
-          "input": ["text", "image"],
-          "contextWindow": 131072,
+          "id": "incoai/Qwen3.6-35B-A3B-Splash",
+          "name": "Qwen3.6 35B A3B 4-bit + DFlash2 (Splash :8000)",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "none",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "high",
+            "max": "high"
+          },
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
           "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "lmstudio-community/qwen3.8-27b",
-          "name": "Qwen 3.8 27B dense Q4_K_M (LM Studio)",
-          "reasoning": false,
-          "input": ["text", "image"],
-          "contextWindow": 65536,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "unsloth/qwen3.8-27b",
-          "name": "Qwen 3.8 27B UD-Q6_K_XL (LM Studio)",
-          "reasoning": false,
-          "input": ["text", "image"],
-          "contextWindow": 65536,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
         }
       ]
     }
